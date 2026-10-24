@@ -1,4 +1,4 @@
--- MySQL Forward Engineering для Отеля (Аналог интернет-магазина)
+-- MySQL Forward Engineering для Отеля 
 
 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
