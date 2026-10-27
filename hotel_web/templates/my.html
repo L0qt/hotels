@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Мои брони</h1>
+{% if rows %}
+<table class="table">
+  <tr><th>ID</th><th>Номер</th><th>Дата заселения</th><th>Суток</th><th>Сумма</th><th>Статус</th><th></th></tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.idbookings }}</td>
+    <td>{{ r.room_number or '—' }}</td>
+    <td>{{ r.bdate }}</td>
+    <td>{{ r.nights or '—' }}</td>
+    <td>{{ '%.0f'|format(r.total or 0) }} ₽</td>
+    <td><span class="status status-{{ 'ok' if r.status=='Оплачено' else ('wait' if r.status=='Забронировано' else 'done') }}">{{ r.status }}</span></td>
+    <td>
+      {% if r.status == 'Забронировано' %}
+      <form method="post" action="{{ url_for('cancel_booking', bid=r.idbookings) }}">
+        <button class="btn btn-danger btn-sm" type="submit">Отменить</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="empty">У вас пока нет броней. <a href="{{ url_for('index') }}">Выберите номер</a> — и это легко исправить 😉</p>
+{% endif %}
+{% endblock %}

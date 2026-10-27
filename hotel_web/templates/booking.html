@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Бронирование номера {{ room[1] }}{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <div class="login-card">
+    <h1>Бронирование номера {{ room[1] }}</h1>
+    <p class="muted">{{ room[5] }} · {{ room[6] }} · {{ room[4] }}</p>
+    <p class="price-big">{{ "%.0f"|format(room[2]) }} ₽ за сутки</p>
+    <form method="post">
+      <label>ФИО</label>
+      <input type="text" name="fio" placeholder="Иванов Иван Иванович" required>
+      <label>Номер телефона</label>
+      <input type="text" name="phone" placeholder="89151234567" required>
+      <label>Эл. почта</label>
+      <input type="email" name="email" placeholder="you@mail.ru">
+      <label>Дата заселения</label>
+      <input type="date" name="checkin" value="{{ today }}" required>
+      <label>Количество суток</label>
+      <input type="number" name="days" min="1" value="1" required>
+      <button type="submit" class="btn btn-primary btn-wide">Оформить бронь</button>
+    </form>
+    <a class="back-link" href="{{ url_for('index') }}">← Вернуться к номерам</a>
+  </div>
+</div>
+{% endblock %}

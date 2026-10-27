@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Номера — Отель «Морской бриз»{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Наши номера</h1>
+  <p class="muted">Выберите номер и оформите бронирование онлайн</p>
+</div>
+
+<div class="cards">
+  {% for r in rooms %}
+  <div class="card room-card">
+    <div class="card-top">
+      <span class="badge">{{ r[5] }}</span>
+      <span class="badge badge-blue">{{ r[6] }}</span>
+    </div>
+    <h2>Номер {{ r[1] }}</h2>
+    <p class="room-desc">{{ r[4] }} — {{ r[3] }}</p>
+    <p class="room-features">✨ {{ r[3] }}</p>
+    <p class="room-hotel">🏨 {{ r[7] }}</p>
+    <div class="card-bottom">
+      <span class="price">{{ "%.0f"|format(r[2]) }} ₽ / сутки</span>
+      <a class="btn btn-primary" href="{{ url_for('book', room_id=r[0]) }}">Забронировать</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

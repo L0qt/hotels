@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Отдых, который запомнится</h1>
+  <p>Выберите номер — от уютных стандартов до президентского люкса. Бронируйте онлайн за пару кликов.</p>
+</section>
+
+<div class="filters">
+  <a class="chip {{ 'active' if not cat else '' }}" href="{{ url_for('index') }}">Все номера</a>
+  {% for c in categories %}
+    <a class="chip {{ 'active' if cat == c.id|string else '' }}" href="{{ url_for('index', cat=c.id) }}">{{ c.name }}</a>
+  {% endfor %}
+</div>
+
+<div class="grid">
+{% for r in rooms %}
+  <div class="card">
+    <img src="{{ url_for('static', filename='img/room' ~ r.idrooms ~ '.png') }}"
+         onerror="this.src='{{ url_for('static', filename='img/default.png') }}'" alt="Номер {{ r['номер комнаты'] }}">
+    <div class="card-body">
+      <h3>Номер {{ r['номер комнаты'] }} · {{ r.cat }}</h3>
+      <p class="muted">{{ r['характеристика'] or '' }}{% if r['описание'] %} — {{ r['описание'] }}{% endif %}</p>
+      <div class="card-footer">
+        <span class="price">{{ '%.0f'|format(r['цена за сутки'] or 0) }} ₽ <small>/ сутки</small></span>
+        <a class="btn" href="{{ url_for('room_detail', rid=r.idrooms) }}">Подробнее</a>
+      </div>
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% if not rooms %}<p class="empty">По этой категории номеров пока нет.</p>{% endif %}
+{% endblock %}

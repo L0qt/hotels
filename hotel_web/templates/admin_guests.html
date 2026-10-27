@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Гости — Панель администратора{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>👥 Гости</h1>
+  <div class="tabs">
+    <a class="tab" href="{{ url_for('admin') }}">Обзор</a>
+    <a class="tab active" href="{{ url_for('admin_guests') }}">Гости</a>
+    <a class="tab" href="{{ url_for('admin_bookings') }}">Бронирования</a>
+  </div>
+</div>
+
+<form class="toolbar" method="get">
+  <input type="text" name="search" value="{{ search }}" placeholder="Поиск по ФИО, телефону, ID...">
+  <button type="submit" class="btn btn-primary">Найти</button>
+</form>
+
+<div class="two-col">
+  <div>
+    <table class="table">
+      <tr><th>ID</th><th>ФИО</th><th>Телефон</th><th>Почта</th><th></th></tr>
+      {% for g in guests %}
+      <tr>
+        <td>{{ g[0] }}</td>
+        <td>{{ g[1] }}</td>
+        <td>{{ g[2] }}</td>
+        <td>{{ g[3] or '—' }}</td>
+        <td><a class="btn btn-danger btn-small" href="{{ url_for('admin_guests_delete', guest_id=g[0]) }}"
+               onclick="return confirm('Удалить гостя {{ g[1] }}?')">🗑</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="side-form card">
+    <h3>Добавить гостя</h3>
+    <form method="post" action="{{ url_for('admin_guests_add') }}">
+      <label>ФИО</label>
+      <input type="text" name="fio" required>
+      <label>Номер телефона</label>
+      <input type="text" name="phone" required>
+      <label>Эл. почта</label>
+      <input type="email" name="email">
+      <button type="submit" class="btn btn-primary btn-wide">Добавить</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
