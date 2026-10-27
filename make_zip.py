@@ -19,7 +19,6 @@ UPLOAD_FOLDER = os.path.join('static', 'uploads')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ЛИМИТ НОМЕРОВ
 MAX_ROOMS = 10 
 
 class DatabaseManager:
@@ -100,7 +99,6 @@ class DatabaseManager:
                 paths.append(f'/static/uploads/{filename}')
         return ','.join(paths)
 
-    # --- Управление пользователями ---
     def get_user_by_username(self, username):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     def get_user_by_id(self, user_id):
@@ -125,7 +123,6 @@ class DatabaseManager:
             conn.cursor().execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
             conn.commit()
 
-    # --- Управление номерами ---
     def get_all_rooms(self):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM rooms").fetchall()
     def get_room(self, room_id):
@@ -143,7 +140,6 @@ class DatabaseManager:
             conn.cursor().execute("DELETE FROM rooms WHERE id = ?", (room_id,))
             conn.commit()
 
-    # --- Управление меню ---
     def get_all_menu(self):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu").fetchall()
     def get_menu_item(self, item_id):
@@ -161,7 +157,6 @@ class DatabaseManager:
             conn.cursor().execute("DELETE FROM menu WHERE id = ?", (item_id,))
             conn.commit()
 
-    # --- Бронирования ---
     def add_booking(self, room_id, user_id, check_in, check_out, total_price):
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO bookings (room_id, user_id, check_in, check_out, total_price) VALUES (?, ?, ?, ?, ?)", (room_id, user_id, check_in, check_out, total_price))
@@ -181,7 +176,6 @@ class DatabaseManager:
             conn.cursor().execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
             conn.commit()
 
-    # --- Отзывы ---
     def add_review(self, room_id, user_id, rating, comment):
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO reviews (room_id, user_id, rating, comment, date) VALUES (?, ?, ?, ?, ?)", (room_id, user_id, rating, comment, datetime.now().strftime('%Y-%m-%d')))
@@ -197,7 +191,6 @@ class DatabaseManager:
             conn.cursor().execute("DELETE FROM reviews WHERE id = ?", (review_id,))
             conn.commit()
 
-    # --- Заказы еды ---
     def add_food_order(self, user_id, room_id, item_name, price, quantity):
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO food_orders (user_id, room_id, item_name, price, quantity, date) VALUES (?, ?, ?, ?, ?, ?)", (user_id, room_id, item_name, price, quantity, datetime.now().strftime('%Y-%m-%d %H:%M')))
@@ -214,8 +207,6 @@ class DatabaseManager:
             conn.commit()
 
 db = DatabaseManager()
-
-# --- МАРШРУТЫ ---
 
 @app.route('/')
 def index():
@@ -310,8 +301,6 @@ def order_food():
     flash('Заказ принят! Ожидайте доставку.', 'success')
     return redirect(url_for('user_dashboard'))
 
-# --- АДМИНКА ---
-
 @app.route('/admin')
 def admin_dashboard():
     if session.get('role') != 'admin': return "Доступ запрещен", 403
@@ -321,16 +310,12 @@ def admin_dashboard():
                            bookings=bookings, food_orders=db.get_all_food_orders(), 
                            reviews=db.get_all_reviews(), revenue=sum(float(b['total_price']) for b in bookings if b['total_price']))
 
-# --- ТОТАЛЬНЫЙ КОНТРОЛЬ: НОМЕРА ---
 @app.route('/admin/add_room', methods=['GET', 'POST'])
 def admin_add_room():
     if session.get('role') != 'admin': return "Доступ запрещен", 403
-    
-    # Лимит номеров
     if len(db.get_all_rooms()) >= MAX_ROOMS:
-        flash(f'Достигнут лимит номеров ({MAX_ROOMS})! Удалите старый номер или измените лимит в коде.', 'danger')
+        flash(f'Достигнут лимит номеров ({MAX_ROOMS})! Удалите старый номер.', 'danger')
         return redirect(url_for('admin_dashboard'))
-
     if request.method == 'POST':
         files = request.files.getlist('images')
         images_str = db.save_files(files)
@@ -347,7 +332,6 @@ def admin_edit_room(room_id):
     if request.method == 'POST':
         files = request.files.getlist('images')
         new_images = db.save_files(files)
-        # Если загрузили новые фото, заменяем. Если нет - оставляем старые.
         images_str = new_images if new_images else room['images']
         db.update_room(room_id, request.form['title'], float(request.form['price']), request.form['description'], images_str, request.form['amenities'])
         flash('Номер обновлен!', 'success')
@@ -361,7 +345,6 @@ def admin_delete_room(room_id):
     flash('Номер удален!', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# --- ТОТАЛЬНЫЙ КОНТРОЛЬ: МЕНЮ ---
 @app.route('/admin/add_menu', methods=['GET', 'POST'])
 def admin_add_menu():
     if session.get('role') != 'admin': return "Доступ запрещен", 403
@@ -391,7 +374,6 @@ def admin_delete_menu(item_id):
     flash('Блюдо удалено!', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# --- ТОТАЛЬНЫЙ КОНТРОЛЬ: БРОНИ, ПОЛЬЗОВАТЕЛИ, ОТЗЫВЫ ---
 @app.route('/admin/edit_booking/<int:booking_id>', methods=['POST'])
 def admin_edit_booking(booking_id):
     if session.get('role') != 'admin': return "Доступ запрещен", 403
@@ -472,6 +454,17 @@ base_html = f'''<!DOCTYPE html>
         .form-control, .form-select {{ border-radius: 0; border: 1px solid #ddd; padding: 12px; }}
         .form-control:focus, .form-select:focus {{ box-shadow: none; border-color: var(--gold); }}
         .carousel-item img {{ height: 500px; object-fit: cover; }}
+        
+        /* --- ИСПРАВЛЕННЫЕ СТИЛИ ДЛЯ ЧИТАЕМОСТИ АДМИНКИ --- */
+        .nav-tabs {{ border-bottom: 2px solid #c8a97e; }}
+        .nav-tabs .nav-link {{ color: #111 !important; font-weight: 800; font-size: 1.05rem; border: none; margin-right: 10px; transition: all 0.2s; }}
+        .nav-tabs .nav-link:hover {{ color: #c8a97e !important; }}
+        .nav-tabs .nav-link.active {{ color: #c8a97e !important; border-bottom: 3px solid #c8a97e; background: transparent; }}
+        .table {{ background-color: #ffffff; }}
+        .table thead th {{ background-color: #111111 !important; color: #ffffff !important; font-weight: 700; border: none; }}
+        .table tbody td {{ color: #222222; font-weight: 500; vertical-align: middle; }}
+        .form-select, .form-control {{ color: #000000 !important; font-weight: 600; border: 2px solid #ccc; background-color: #fff; }}
+        .form-select:focus, .form-control:focus {{ border-color: #c8a97e; box-shadow: none; }}
     </style>
 </head>
 <body>
@@ -827,7 +820,7 @@ admin_dashboard_html = '''{% extends 'base.html' %}
     <div class="tab-content">
         <div class="tab-pane fade show active" id="tab-bookings">
             <div class="card border-0 shadow-sm"><div class="card-body p-0 table-responsive"><table class="table table-hover mb-0">
-                <thead class="table-light"><tr><th>ID</th><th>Гость</th><th>Номер</th><th>Даты (Изменить)</th><th>Сумма (Изменить)</th><th>Статус</th><th></th></tr></thead>
+                <thead><tr><th>ID</th><th>Гость</th><th>Номер</th><th>Даты (Изменить)</th><th>Сумма (Изменить)</th><th>Статус</th><th></th></tr></thead>
                 <tbody>
                     {% for b in bookings %}
                     <tr>
@@ -837,9 +830,7 @@ admin_dashboard_html = '''{% extends 'base.html' %}
                             <input type="date" name="check_in" value="{{ b.check_in }}" class="form-control form-control-sm mb-1">
                             <input type="date" name="check_out" value="{{ b.check_out }}" class="form-control form-control-sm">
                         </td>
-                        <td>
-                            <input type="number" name="total_price" value="{{ b.total_price }}" class="form-control form-control-sm" style="width: 100px;">
-                        </td>
+                        <td><input type="number" name="total_price" value="{{ b.total_price }}" class="form-control form-control-sm" style="width: 100px;"></td>
                         <td>
                             <select name="status" class="form-select form-select-sm rounded-0">
                                 <option value="Забронировано" {% if b.status == 'Забронировано' %}selected{% endif %}>Забронировано</option>
@@ -847,9 +838,7 @@ admin_dashboard_html = '''{% extends 'base.html' %}
                                 <option value="Выселен" {% if b.status == 'Выселен' %}selected{% endif %}>Выселен</option>
                             </select>
                         </td>
-                        <td>
-                            <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-save"></i></button>
-                        </form>
+                        <td><button type="submit" class="btn btn-sm btn-success"><i class="fas fa-save"></i></button></form>
                             <a href="{{ url_for('admin_delete_booking', booking_id=b.id) }}" class="btn btn-sm btn-outline-danger mt-1" onclick="return confirm('Удалить?')"><i class="fas fa-trash"></i></a>
                         </td>
                     </tr>
@@ -898,7 +887,7 @@ admin_dashboard_html = '''{% extends 'base.html' %}
         </div>
         <div class="tab-pane fade" id="tab-food">
             <div class="card border-0 shadow-sm"><div class="card-body p-0 table-responsive"><table class="table table-hover mb-0">
-                <thead class="table-light"><tr><th>ID</th><th>Гость</th><th>Номер</th><th>Блюдо</th><th>Кол-во</th><th>Статус</th></tr></thead>
+                <thead><tr><th>ID</th><th>Гость</th><th>Номер</th><th>Блюдо</th><th>Кол-во</th><th>Статус</th></tr></thead>
                 <tbody>
                     {% for f in food_orders %}
                     <tr>
@@ -920,19 +909,15 @@ admin_dashboard_html = '''{% extends 'base.html' %}
         </div>
         <div class="tab-pane fade" id="tab-users">
             <div class="card border-0 shadow-sm"><div class="card-body p-0 table-responsive"><table class="table table-hover mb-0">
-                <thead class="table-light"><tr><th>ID</th><th>Логин</th><th>ФИО</th><th>Телефон</th><th>Роль</th><th>Действия</th></tr></thead>
+                <thead><tr><th>ID</th><th>Логин</th><th>ФИО</th><th>Телефон</th><th>Роль</th><th>Действия</th></tr></thead>
                 <tbody>
                     {% for u in users %}
                     <tr>
                         <td>#{{ u.id }}</td><td>{{ u.username }}</td><td>{{ u.fullname }}</td><td>{{ u.phone }}</td>
                         <td><span class="badge {% if u.role == 'admin' %}bg-danger{% else %}bg-secondary{% endif %}">{{ u.role }}</span></td>
                         <td>
-                            {% if u.role != 'admin' %}
-                            <a href="{{ url_for('admin_make_admin', user_id=u.id) }}" class="btn btn-sm btn-outline-dark" title="Сделать админом"><i class="fas fa-user-shield"></i></a>
-                            {% endif %}
-                            {% if u.id != session['user_id'] %}
-                            <a href="{{ url_for('admin_delete_user', user_id=u.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить пользователя?')"><i class="fas fa-trash"></i></a>
-                            {% endif %}
+                            {% if u.role != 'admin' %}<a href="{{ url_for('admin_make_admin', user_id=u.id) }}" class="btn btn-sm btn-outline-dark" title="Сделать админом"><i class="fas fa-user-shield"></i></a>{% endif %}
+                            {% if u.id != session['user_id'] %}<a href="{{ url_for('admin_delete_user', user_id=u.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить пользователя?')"><i class="fas fa-trash"></i></a>{% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -941,7 +926,7 @@ admin_dashboard_html = '''{% extends 'base.html' %}
         </div>
         <div class="tab-pane fade" id="tab-reviews">
             <div class="card border-0 shadow-sm"><div class="card-body p-0 table-responsive"><table class="table table-hover mb-0">
-                <thead class="table-light"><tr><th>Гость</th><th>Номер</th><th>Оценка</th><th>Комментарий</th><th>Удалить</th></tr></thead>
+                <thead><tr><th>Гость</th><th>Номер</th><th>Оценка</th><th>Комментарий</th><th>Удалить</th></tr></thead>
                 <tbody>
                     {% for r in reviews %}
                     <tr>
