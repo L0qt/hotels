@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Отзывы гостей</h1>
+<table class="table">
+  <tr><th>ID</th><th>Гость</th><th>Номер комнаты</th><th>Оценка</th><th>Комментарий</th><th>Действия</th></tr>
+  {% for rv in reviews %}
+  <tr>
+    <td>{{ rv.idreviews }}</td><td>{{ rv.guest_name }}</td><td>{{ rv.room_number }}</td>
+    <td class="stars">{{ '★' * (rv.rating|int if rv.rating|int <= 5 else 5) }}</td>
+    <td>{{ rv.comment }}</td>
+    <td>
+      <form method="post" action="{{ url_for('admin_review_delete', rid=rv.idreviews) }}">
+        <button class="btn btn-danger btn-sm" type="submit">🗑️</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

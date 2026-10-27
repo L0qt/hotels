@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Управление номерами</h1>
+
+<form class="panel" method="post">
+  <h3>{{ 'Редактирование номера #' ~ edit_room.idrooms if edit_room else 'Добавить номер' }}</h3>
+  <input type="hidden" name="id" value="{{ edit_room.idrooms if edit_room else '' }}">
+  <div class="form-row">
+    <label>Номер комнаты <input type="number" name="number" value="{{ edit_room['номер комнаты'] if edit_room else '' }}" required></label>
+    <label>Цена за сутки <input type="number" step="0.01" name="price" value="{{ edit_room['цена за сутки'] if edit_room else '' }}" required></label>
+  </div>
+  <div class="form-row">
+    <label>Категория
+      <select name="cat_id">
+        {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if edit_room and edit_room.cat_id == c.id }}>{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Класс
+      <select name="cls_id">
+        {% for c in classes %}<option value="{{ c.id }}" {{ 'selected' if edit_room and edit_room.cls_id == c.id }}>{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+  <div class="form-row">
+    <label>Характеристика <input type="text" name="features" maxlength="45" value="{{ edit_room['характеристика'] if edit_room else '' }}" placeholder="Wi-Fi, кондиционер"></label>
+    <label>Описание <input type="text" name="description" maxlength="45" value="{{ edit_room['описание'] if edit_room else '' }}" placeholder="Короткое описание"></label>
+  </div>
+  <button class="btn btn-lg" type="submit">{{ 'Сохранить изменения' if edit_room else 'Добавить номер' }}</button>
+  {% if edit_room %}<a class="btn btn-ghost" href="{{ url_for('admin_rooms') }}">Отмена</a>{% endif %}
+</form>
+
+<table class="table">
+  <tr><th>ID</th><th>Комната</th><th>Категория</th><th>Класс</th><th>Цена</th><th>Характеристика</th><th>Действия</th></tr>
+  {% for r in rooms %}
+  <tr>
+    <td>{{ r.idrooms }}</td><td>{{ r['номер комнаты'] }}</td><td>{{ r.cat }}</td><td>{{ r.cls }}</td>
+    <td>{{ '%.0f'|format(r['цена за сутки'] or 0) }} ₽</td><td>{{ r['характеристика'] or '—' }}</td>
+    <td class="actions">
+      <a class="btn btn-sm" href="{{ url_for('admin_rooms', edit=r.idrooms) }}">✏️</a>
+      <form method="post" action="{{ url_for('admin_room_delete', rid=r.idrooms) }}">
+        <button class="btn btn-danger btn-sm" type="submit">🗑️</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

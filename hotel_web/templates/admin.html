@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Панель администратора{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>⚙️ Панель администратора</h1>
+  <div class="tabs">
+    <a class="tab active" href="{{ url_for('admin') }}">Обзор</a>
+    <a class="tab" href="{{ url_for('admin_guests') }}">Гости</a>
+    <a class="tab" href="{{ url_for('admin_bookings') }}">Бронирования</a>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat-card"><span class="stat-num">{{ guests }}</span><span class="stat-label">Гостей в базе</span></div>
+  <div class="stat-card"><span class="stat-num">{{ bookings }}</span><span class="stat-label">Бронирований</span></div>
+  <div class="stat-card"><span class="stat-num">{{ rooms }}</span><span class="stat-label">Номеров</span></div>
+  <div class="stat-card stat-money"><span class="stat-num">{{ "%.0f"|format(revenue) }} ₽</span><span class="stat-label">Общая выручка</span></div>
+</div>
+
+<h2>Последние бронирования</h2>
+<table class="table">
+  <tr><th>№ брони</th><th>Дата заселения</th><th>Статус</th><th>Сумма</th><th>Гость</th></tr>
+  {% for b in recent %}
+  <tr>
+    <td>{{ b[0] }}</td>
+    <td>{{ b[1] }}</td>
+    <td><span class="badge {% if b[2] == 'Оплачено' %}badge-green{% elif b[2] == 'Выселен' %}badge-gray{% else %}badge-blue{% endif %}">{{ b[2] }}</span></td>
+    <td>{{ "%.2f"|format(b[3]) }} ₽</td>
+    <td>{{ b[4] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

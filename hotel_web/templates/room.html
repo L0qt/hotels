@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="detail">
+  <div class="detail-img">
+    <img src="{{ url_for('static', filename='img/room' ~ room.idrooms ~ '.png') }}"
+         onerror="this.src='{{ url_for('static', filename='img/default.png') }}'" alt="Номер">
+  </div>
+  <div class="detail-info">
+    <h1>Номер {{ room['номер комнаты'] }}</h1>
+    <p class="badge">{{ room.cat }} · {{ room.cls }}</p>
+    <p class="price-big">{{ '%.0f'|format(room['цена за сутки'] or 0) }} ₽ <small>за сутки</small></p>
+    <p><b>Что есть в номере:</b> {{ room['характеристика'] or '—' }}</p>
+    <p><b>Описание:</b> {{ room['описание'] or '—' }}</p>
+
+    {% if user %}
+      <form class="panel" method="post">
+        <h3>Забронировать этот номер</h3>
+        <label>Дата заселения
+          <input type="date" name="date" value="2026-11-01" required>
+        </label>
+        <label>Количество суток
+          <input type="number" name="nights" value="1" min="1" max="90" required>
+        </label>
+        <label>Купон (необязательно)
+          <input type="text" name="coupon" placeholder="например WELCOME10">
+        </label>
+        <button class="btn btn-lg" type="submit">Забронировать</button>
+        <p class="hint">Итоговая сумма = цена за сутки × количество суток. Купон подставит вашу скидку в базу.</p>
+      </form>
+    {% else %}
+      <p class="panel hint">Чтобы забронировать номер, <a href="{{ url_for('login') }}">войдите</a>
+      или <a href="{{ url_for('register') }}">зарегистрируйтесь</a>.</p>
+    {% endif %}
+  </div>
+</div>
+
+<section class="reviews">
+  <h2>Отзывы об этом номере</h2>
+  {% for rv in reviews %}
+    <div class="review">
+      <b>{{ rv.guest_name }}</b> <span class="stars">{{ '★' * (rv.rating|int) }}{{ '☆' * (5 - (rv.rating|int if rv.rating|int <= 5 else 5)) }}</span>
+      <p>{{ rv.comment }}</p>
+    </div>
+  {% else %}
+    <p class="muted">Пока никто не оставил отзыв — станьте первым!</p>
+  {% endfor %}
+
+  {% if user %}
+    <form class="panel" method="post" action="{{ url_for('add_review', rid=room.idrooms) }}">
+      <h3>Оставить отзыв</h3>
+      <label>Оценка
+        <select name="rating">
+          {% for i in [5,4,3,2,1] %}<option value="{{ i }}">{{ '★' * i }} ({{ i }})</option>{% endfor %}
+        </select>
+      </label>
+      <label>Комментарий
+        <input type="text" name="comment" maxlength="45" placeholder="Пара слов о номере">
+      </label>
+      <button class="btn" type="submit">Отправить отзыв</button>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

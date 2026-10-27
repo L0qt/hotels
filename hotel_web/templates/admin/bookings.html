@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Управление бронями</h1>
+
+<form class="panel filters-panel" method="get">
+  <label>Поиск <input type="text" name="q" value="{{ search }}" placeholder="ID или ФИО гостя"></label>
+  <label>Статус
+    <select name="status">
+      {% for s in ['Все', 'Забронировано', 'Оплачено', 'Выселен'] %}
+      <option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Дата <input type="text" name="date" value="{{ date_part }}" placeholder="2026-11"></label>
+  <button class="btn" type="submit">Применить</button>
+  <a class="btn btn-ghost" href="{{ url_for('admin_bookings') }}">Сброс</a>
+</form>
+
+<p class="total-line">Найдено броней: <b>{{ rows|length }}</b> · Сумма по выборке: <b>{{ '%.0f'|format(total) }} ₽</b></p>
+
+<table class="table">
+  <tr><th>ID</th><th>Гость</th><th>Номер</th><th>Дата</th><th>Суток</th><th>Сумма</th><th>Купон</th><th>Статус</th><th></th></tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.idbookings }}</td>
+    <td>{{ r.guest_name }}<br><small class="muted">{{ r.guest_phone or '' }}</small></td>
+    <td>{{ r.room_number or '—' }}</td>
+    <td>{{ r.bdate }}</td>
+    <td>{{ r.nights or '—' }}</td>
+    <td>{{ '%.0f'|format(r.total or 0) }} ₽</td>
+    <td>{{ r.coupon or '—' }}</td>
+    <td>
+      <form method="post" action="{{ url_for('admin_booking_status', bid=r.idbookings) }}" class="inline-form">
+        <select name="status">
+          {% for s in ['Забронировано', 'Оплачено', 'Выселен'] %}
+          <option value="{{ s }}" {{ 'selected' if r.status == s }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-sm" type="submit">OK</button>
+      </form>
+    </td>
+    <td>
+      <form method="post" action="{{ url_for('admin_booking_delete', bid=r.idbookings) }}">
+        <button class="btn btn-danger btn-sm" type="submit">🗑️</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

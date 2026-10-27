@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Бронирования — Панель администратора{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>📅 Бронирования</h1>
+  <div class="tabs">
+    <a class="tab" href="{{ url_for('admin') }}">Обзор</a>
+    <a class="tab" href="{{ url_for('admin_guests') }}">Гости</a>
+    <a class="tab active" href="{{ url_for('admin_bookings') }}">Бронирования</a>
+  </div>
+</div>
+
+<form class="toolbar" method="get">
+  <input type="text" name="search" value="{{ search }}" placeholder="№ брони или ID гостя" style="max-width:200px">
+  <select name="status">
+    {% for s in ['Все', 'Забронировано', 'Оплачено', 'Выселен'] %}
+    <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <input type="date" name="date" value="{{ fdate }}">
+  <button type="submit" class="btn btn-primary">Применить</button>
+  <a class="btn btn-outline" href="{{ url_for('admin_bookings') }}">Сброс</a>
+</form>
+
+<p class="muted">Найдено: <b>{{ count }}</b> · Сумма: <b>{{ "%.2f"|format(total) }} ₽</b></p>
+
+<div class="two-col">
+  <div>
+    <table class="table">
+      <tr><th>№</th><th>Дата</th><th>Статус</th><th>Сумма</th><th>ID гостя</th><th>Купон</th><th></th></tr>
+      {% for b in bookings %}
+      <tr>
+        <td>{{ b[0] }}</td>
+        <td>{{ b[1] }}</td>
+        <td><span class="badge {% if b[2] == 'Оплачено' %}badge-green{% elif b[2] == 'Выселен' %}badge-gray{% else %}badge-blue{% endif %}">{{ b[2] }}</span></td>
+        <td>{{ "%.2f"|format(b[3]) }} ₽</td>
+        <td>{{ b[4] }}</td>
+        <td>{{ b[5] }}</td>
+        <td><a class="btn btn-danger btn-small" href="{{ url_for('admin_bookings_delete', booking_id=b[0]) }}"
+               onclick="return confirm('Удалить бронь №{{ b[0] }}?')">🗑</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="side-form card">
+    <h3>Новое бронирование</h3>
+    <form method="post" action="{{ url_for('admin_bookings_add') }}">
+      <label>ФИО гостя</label>
+      <input type="text" name="fio" required>
+      <label>Телефон (по нему найдём или создадим гостя)</label>
+      <input type="text" name="phone" required>
+      <label>Эл. почта</label>
+      <input type="email" name="email">
+      <label>Дата заселения</label>
+      <input type="date" name="checkin" required>
+      <label>Суток</label>
+      <input type="number" name="days" min="1" value="1" required>
+      <label>Статус</label>
+      <select name="status">
+        <option>Забронировано</option>
+        <option>Оплачено</option>
+        <option>Выселен</option>
+      </select>
+      <button type="submit" class="btn btn-primary btn-wide">Оформить</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

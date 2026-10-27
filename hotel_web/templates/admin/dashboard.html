@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Панель администратора</h1>
+<div class="stats">
+  <div class="stat"><b>{{ stats.guests }}</b><span>гостей</span></div>
+  <div class="stat"><b>{{ stats.bookings }}</b><span>броней</span></div>
+  <div class="stat"><b>{{ '%.0f'|format(stats.revenue) }} ₽</b><span>выручка</span></div>
+  <div class="stat"><b>{{ stats.rooms }}</b><span>номеров</span></div>
+  <div class="stat"><b>{{ stats.users }}</b><span>пользователей</span></div>
+  <div class="stat"><b>{{ stats.free_places }}</b><span>свободных мест</span></div>
+</div>
+
+<div class="admin-links">
+  <a class="btn" href="{{ url_for('admin_rooms') }}">Номера</a>
+  <a class="btn" href="{{ url_for('admin_bookings') }}">Брони</a>
+  <a class="btn" href="{{ url_for('admin_guests') }}">Гости</a>
+  <a class="btn" href="{{ url_for('admin_reviews') }}">Отзывы</a>
+</div>
+
+<h2>Последние брони</h2>
+<table class="table">
+  <tr><th>ID</th><th>Гость</th><th>Номер</th><th>Дата</th><th>Сумма</th><th>Статус</th></tr>
+  {% for r in recent %}
+  <tr>
+    <td>{{ r.idbookings }}</td><td>{{ r.guest_name }}</td><td>{{ r.room_number or '—' }}</td>
+    <td>{{ r.bdate }}</td><td>{{ '%.0f'|format(r.total or 0) }} ₽</td>
+    <td>{{ r.status }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
