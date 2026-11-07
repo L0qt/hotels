@@ -1,4 +1,3 @@
-
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import sqlite3
 import os
@@ -201,6 +200,88 @@ class DatabaseManager:
             conn.commit()
 
 db = DatabaseManager()
+
+
+# ─────────────────────────────────────────────────────────────
+# ОПОВЕЩЕНИЯ О ЗАЕЗДЕ / ВЫЕЗДЕ
+# ─────────────────────────────────────────────────────────────
+ACTIVE_BOOKING_STATUSES = ('Забронировано', 'Оплачено')
+CHECK_IN_REMIND_DAYS = 3
+
+
+def get_user_notifications(bookings):
+    """Формирует список оповещений о заезде/выезде для гостя."""
+    today = datetime.now().date()
+    notifications = []
+
+    for b in bookings:
+        if b['status'] not in ACTIVE_BOOKING_STATUSES:
+            continue
+
+        try:
+            check_in = datetime.strptime(b['check_in'], '%Y-%m-%d').date()
+            check_out = datetime.strptime(b['check_out'], '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            continue
+
+        room_title = b['title'] or f"№{b['room_id']}"
+        days_to_in = (check_in - today).days
+        days_to_out = (check_out - today).days
+
+        # ── Оповещения о заезде ──
+        if days_to_in == 0:
+            notifications.append({
+                'type': 'warning',
+                'icon': '🔑',
+                'title': 'Заезд сегодня',
+                'message': f'Сегодня заезд в номер «{room_title}». '
+                           f'Возьмите документы и подтвердите бронь на ресепшене (заезд с 14:00).',
+                'booking_id': b['id'],
+            })
+        elif 0 < days_to_in <= CHECK_IN_REMIND_DAYS:
+            notifications.append({
+                'type': 'info',
+                'icon': '📅',
+                'title': 'Скоро заезд',
+                'message': f'Напоминание: заезд в номер «{room_title}» через {days_to_in} дн. '
+                           f'({b["check_in"]}).',
+                'booking_id': b['id'],
+            })
+
+        # ── Оповещения о выезде ──
+        if days_to_out == 0 and today >= check_in:
+            notifications.append({
+                'type': 'danger',
+                'icon': '🚪',
+                'title': 'Выезд сегодня',
+                'message': f'Сегодня выезд из номера «{room_title}». '
+                           f'Освободите номер до 12:00.',
+                'booking_id': b['id'],
+            })
+        elif days_to_out > 0 and check_in <= today < check_out:
+            notifications.append({
+                'type': 'success',
+                'icon': '🏨',
+                'title': 'Вы проживаете в отеле',
+                'message': f'Номер «{room_title}». Выезд через {days_to_out} дн. '
+                           f'({b["check_out"]}).',
+                'booking_id': b['id'],
+            })
+
+    return notifications
+
+
+@app.context_processor
+def inject_notifications():
+    """Делает `notifications` доступными во всех шаблонах для авторизованного гостя."""
+    if session.get('role') == 'user':
+        try:
+            bookings = db.get_user_bookings(session['user_id'])
+            return {'notifications': get_user_notifications(bookings)}
+        except Exception:
+            return {'notifications': []}
+    return {'notifications': []}
+
 
 @app.route('/')
 def index():
