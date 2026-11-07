@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-5 py-4"><div class="row justify-content-center"><div class="col-md-8">
+    <div class="card p-5 border-0 shadow-sm">
+        <h2 class="mb-4">Редактировать номер</h2>
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3"><label class="form-label small text-uppercase fw-bold">Название</label><input type="text" name="title" class="form-control" value="{{ room.title }}" required></div>
+            <div class="mb-3"><label class="form-label small text-uppercase fw-bold">Цена за ночь (₽)</label><input type="number" step="0.01" name="price" class="form-control" value="{{ room.price }}" required></div>
+            <div class="mb-3"><label class="form-label small text-uppercase fw-bold">Описание</label><textarea name="description" class="form-control" rows="4" required>{{ room.description }}</textarea></div>
+            
+            <div class="mb-3">
+                <label class="form-label small text-uppercase fw-bold">Текущие фото:</label><br>
+                {% for img in room.images.split(',') %}
+                    <img src="{{ img }}" style="height: 80px; object-fit: cover; margin-right: 5px; margin-bottom: 5px;">
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small text-uppercase fw-bold">Загрузить новые фото (заменят старые)</label>
+                <input type="file" name="images" class="form-control" accept="image/*" multiple>
+                <div class="form-text text-danger">Внимание: если выберете файлы, старые фото удалятся из галереи!</div>
+            </div>
+            
+            <div class="mb-4"><label class="form-label small text-uppercase fw-bold">Удобства</label><input type="text" name="amenities" class="form-control" value="{{ room.amenities }}" required></div>
+            <button type="submit" class="btn btn-gold px-5 rounded-0">Обновить номер</button>
+        </form>
+    </div>
+</div></div></div>
+{% endblock %}

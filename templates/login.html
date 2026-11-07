@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-5 py-5"><div class="row justify-content-center"><div class="col-md-5">
+    <div class="card p-5 shadow-lg border-0">
+        <h2 class="text-center mb-4">Вход в систему</h2>
+        <form method="POST">
+            <div class="mb-3"><label class="form-label small text-uppercase fw-bold">Логин</label><input type="text" name="username" class="form-control" required placeholder="Введите логин"></div>
+            <div class="mb-4"><label class="form-label small text-uppercase fw-bold">Пароль</label><input type="password" name="password" class="form-control" required placeholder="Введите пароль"></div>
+            <button type="submit" class="btn btn-gold w-100 btn-lg rounded-0">Войти</button>
+        </form>
+        <div class="mt-4 text-center"><span class="text-muted small">Нет аккаунта? <a href="{{ url_for('register') }}" class="text-gold fw-bold text-decoration-none">Зарегистрироваться</a></span></div>
+    </div>
+</div></div></div>
+{% endblock %}

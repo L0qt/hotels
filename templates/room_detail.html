@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div id="roomCarousel" class="carousel slide mb-4 shadow" data-bs-ride="carousel">
+                <div class="carousel-inner">
+                    {% for img in images %}
+                    <div class="carousel-item {% if loop.first %}active{% endif %}">
+                        <img src="{{ img }}" class="d-block w-100" style="height: 500px; object-fit: cover;" alt="Фото номера">
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if images|length > 1 %}
+                <button class="carousel-control-prev" type="button" data-bs-target="#roomCarousel" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon" aria-hidden="true" style="background-color: rgba(0,0,0,0.5); padding: 20px; border-radius: 50%;"></span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#roomCarousel" data-bs-slide="next">
+                    <span class="carousel-control-next-icon" aria-hidden="true" style="background-color: rgba(0,0,0,0.5); padding: 20px; border-radius: 50%;"></span>
+                </button>
+                {% endif %}
+            </div>
+
+            <h1 class="display-4">{{ room.title }}</h1>
+            <p class="lead text-muted mt-3">{{ room.description }}</p>
+            
+            <h4 class="mt-5 mb-3">Удобства в номере:</h4>
+            <div class="row bg-white p-4 shadow-sm mx-0">
+                {% for amenity in room.amenities.split(',') %}
+                <div class="col-md-4 col-6 mb-2"><i class="fas fa-check-circle me-2 text-gold"></i>{{ amenity.strip() }}</div>
+                {% endfor %}
+            </div>
+            <h4 class="mt-5 mb-4">Отзывы гостей ({{ reviews|length }})</h4>
+            {% if reviews %}
+                {% for r in reviews %}
+                <div class="card mb-3 rounded-0 border-0 shadow-sm p-3">
+                    <div class="d-flex justify-content-between"><h6 class="fw-bold mb-1">{{ r.guest_name }}</h6><small class="text-muted">{{ r.date }}</small></div>
+                    <div class="text-gold mb-2">{% for i in range(r.rating) %}<i class="fas fa-star"></i>{% endfor %}</div>
+                    <p class="mb-0">{{ r.comment }}</p>
+                </div>
+                {% endfor %}
+            {% else %}<p class="text-muted">Пока нет отзывов. Будьте первым!</p>{% endif %}
+            {% if session.get('role') == 'user' %}
+            <div class="card p-4 mt-4 rounded-0 border-0 shadow-sm bg-white">
+                <h5>Оставить отзыв</h5>
+                <form action="{{ url_for('add_review', room_id=room.id) }}" method="POST">
+                    <div class="mb-3"><label class="form-label">Оценка</label>
+                        <select name="rating" class="form-select" required>
+                            <option value="5">5 звезд - Отлично</option><option value="4">4 звезды - Хорошо</option>
+                            <option value="3">3 звезды - Нормально</option><option value="2">2 звезды - Плохо</option><option value="1">1 звезда - Ужасно</option>
+                        </select>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Комментарий</label><textarea name="comment" class="form-control" rows="3" required></textarea></div>
+                    <button type="submit" class="btn btn-dark rounded-0">Отправить отзыв</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        <div class="col-lg-4">
+            <div class="card p-4 sticky-top shadow" style="top: 100px;">
+                <h3 class="text-center mb-4">Бронирование</h3>
+                <div class="text-center mb-4 pb-3 border-bottom"><span class="display-5 fw-bold text-gold">{{ room.price }}</span><span class="text-muted">/ночь</span></div>
+                {% if session.get('role') == 'user' %}
+                <form action="{{ url_for('book_room', room_id=room.id) }}" method="POST">
+                    <div class="mb-3"><label class="form-label small text-uppercase fw-bold">Дата заезда</label><input type="date" name="check_in" class="form-control" required></div>
+                    <div class="mb-4"><label class="form-label small text-uppercase fw-bold">Дата выезда</label><input type="date" name="check_out" class="form-control" required></div>
+                    <button type="submit" class="btn btn-gold w-100 btn-lg rounded-0">Забронировать</button>
+                </form>
+                {% elif session.get('role') == 'admin' %}
+                <div class="alert alert-info text-center rounded-0">Вы администратор.</div>
+                {% else %}
+                <div class="alert alert-warning text-center rounded-0"><i class="fas fa-lock mb-2 fa-2x text-warning"></i><br>Чтобы забронировать, <a href="{{ url_for('login') }}" class="alert-link">войдите</a> или <a href="{{ url_for('register') }}" class="alert-link">зарегистрируйтесь</a>.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

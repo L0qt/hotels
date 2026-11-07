@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-5 py-5"><div class="row justify-content-center"><div class="col-md-6">
+    <div class="card p-5 shadow-lg border-0">
+        <h2 class="text-center mb-4">Создать аккаунт</h2>
+        <form method="POST">
+            <div class="mb-3"><label class="form-label small text-uppercase fw-bold">Логин</label><input type="text" name="username" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label small text-uppercase fw-bold">Пароль</label><input type="password" name="password" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label small text-uppercase fw-bold">ФИО</label><input type="text" name="fullname" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label small text-uppercase fw-bold">Телефон</label><input type="text" name="phone" class="form-control" required></div>
+            <div class="mb-4"><label class="form-label small text-uppercase fw-bold">Email</label><input type="email" name="email" class="form-control" required></div>
+            <button type="submit" class="btn btn-gold w-100 btn-lg rounded-0">Зарегистрироваться</button>
+        </form>
+        <div class="mt-4 text-center"><span class="text-muted small">Уже есть аккаунт? <a href="{{ url_for('login') }}" class="text-gold fw-bold text-decoration-none">Войти</a></span></div>
+    </div>
+</div></div></div>
+{% endblock %}

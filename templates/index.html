@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="position-relative" style="height: 85vh; background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url('/static/placeholder.jpg') center/cover;">
+    <div class="container h-100 d-flex flex-column justify-content-center align-items-center text-center text-white">
+        <h1 class="display-3 fw-bold mb-3" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">Добро пожаловать в Рай</h1>
+        <p class="lead mb-5 fs-4">Откройте для себя непревзойденную роскошь и комфорт на берегу моря.</p>
+        <a href="#rooms" class="btn btn-gold btn-lg px-5 py-3">Выбрать номер</a>
+    </div>
+</div>
+<div class="container my-5 py-5">
+    <div class="row text-center">
+        <div class="col-md-3 mb-4"><i class="fas fa-wifi fa-3x mb-3 text-gold"></i><h5>Бесплатный Wi-Fi</h5><p class="text-muted small">Интернет во всех зонах отеля</p></div>
+        <div class="col-md-3 mb-4"><i class="fas fa-swimmer fa-3x mb-3 text-gold"></i><h5>Бассейн и Спа</h5><p class="text-muted small">Открытый бассейн с подогревом</p></div>
+        <div class="col-md-3 mb-4"><i class="fas fa-utensils fa-3x mb-3 text-gold"></i><h5>Ресторан</h5><p class="text-muted small">Изысканная кухня от шеф-поваров</p></div>
+        <div class="col-md-3 mb-4"><i class="fas fa-concierge-bell fa-3x mb-3 text-gold"></i><h5>Обслуживание 24/7</h5><p class="text-muted small">Консьерж и рум-сервис</p></div>
+    </div>
+</div>
+<div id="rooms" class="container my-5">
+    <h2 class="text-center mb-5 display-4">Наши Номера</h2>
+    <div class="row">
+        {% for room in rooms %}
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card h-100">
+                <img src="{{ room.images.split(',')[0] }}" class="card-img-top" alt="{{ room.title }}" style="height: 250px; object-fit: cover;">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h4 class="card-title mb-0">{{ room.title }}</h4>
+                        <span class="badge bg-dark fs-6 rounded-0">{{ room.price }} ₽/ночь</span>
+                    </div>
+                    <p class="card-text text-muted flex-grow-1 small">{{ room.description[:90] }}...</p>
+                    <div class="mt-3">
+                        <a href="{{ url_for('room_detail', room_id=room.id) }}" class="btn btn-outline-dark w-100 mb-2 rounded-0">Подробнее</a>
+                        <a href="{{ url_for('room_detail', room_id=room.id) }}" class="btn btn-gold w-100 rounded-0">Забронировать</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+<div class="bg-dark text-white py-5 mt-5">
+    <div class="container py-4">
+        <h2 class="text-center mb-5 display-5">Отзывы наших гостей</h2>
+        <div class="row">
+            {% for r in reviews %}
+            <div class="col-md-4 mb-4">
+                <div class="card bg-transparent border border-secondary h-100 p-4 rounded-0">
+                    <div class="mb-2 text-gold">{% for i in range(r.rating) %}<i class="fas fa-star"></i>{% endfor %}</div>
+                    <p class="fst-italic text-light opacity-75">"{{ r.comment }}"</p>
+                    <p class="fw-bold mt-auto mb-0 text-white">— {{ r.guest_name }}</p>
+                    <p class="small text-muted">{{ r.room_title }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grand Hotel - Официальный сайт</title>
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0OCIgZmlsbD0iIzExMTExMSIgc3Ryb2tlPSIjYzhhOTdlIiBzdHJva2Utd2lkdGg9IjQiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9ImNlbnRyYWwiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJQbGF5ZmFpciBEaXNwbGF5LCBzZXJpZiIgZm9udC1zaXplPSI2MCIgZmlsbD0iI2M4YTk3ZSIgZm9udC13ZWlnaHQ9ImJvbGQiPkc8L3RleHQ+PC9zdmc+">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --gold: #c8a97e; --dark: #111111; --light: #f8f5f0; --text: #333333; }
+        body { font-family: 'Montserrat', sans-serif; background-color: var(--light); color: var(--text); overflow-x: hidden; }
+        h1, h2, h3, h4, h5 { font-family: 'Playfair Display', serif; font-weight: 700; }
+        .navbar { background-color: rgba(17, 17, 17, 0.95) !important; backdrop-filter: blur(10px); transition: all 0.3s; padding: 15px 0; }
+        .navbar-brand { font-family: 'Playfair Display', serif; font-size: 1.8rem; color: var(--gold) !important; letter-spacing: 2px; }
+        .nav-link { color: rgba(255,255,255,0.8) !important; font-weight: 500; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px; margin: 0 5px; }
+        .nav-link:hover, .nav-link.active { color: var(--gold) !important; }
+        .btn-gold { background-color: var(--gold); color: white; border: none; padding: 10px 25px; border-radius: 0; text-transform: uppercase; font-weight: 600; letter-spacing: 1px; transition: all 0.3s; }
+        .btn-gold:hover { background-color: #b8956a; color: white; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(200, 169, 126, 0.4); }
+        .btn-outline-gold { border: 1px solid var(--gold); color: var(--gold); border-radius: 0; text-transform: uppercase; font-weight: 600; letter-spacing: 1px; transition: all 0.3s; }
+        .btn-outline-gold:hover { background-color: var(--gold); color: white; }
+        .card { border: none; border-radius: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.05); transition: transform 0.3s, box-shadow 0.3s; background: white; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 15px 40px rgba(0,0,0,0.1); }
+        .footer { background-color: var(--dark); color: rgba(255,255,255,0.7); padding: 50px 0 20px; margin-top: 60px; }
+        .text-gold { color: var(--gold); }
+        .form-control, .form-select { border-radius: 0; border: 1px solid #ddd; padding: 12px; }
+        .form-control:focus, .form-select:focus { box-shadow: none; border-color: var(--gold); }
+        .carousel-item img { height: 500px; object-fit: cover; }
+        
+        /* --- ИСПРАВЛЕННЫЕ СТИЛИ ДЛЯ ЧИТАЕМОСТИ АДМИНКИ --- */
+        .nav-tabs { border-bottom: 2px solid #c8a97e; }
+        .nav-tabs .nav-link { color: #111 !important; font-weight: 800; font-size: 1.05rem; border: none; margin-right: 10px; transition: all 0.2s; }
+        .nav-tabs .nav-link:hover { color: #c8a97e !important; }
+        .nav-tabs .nav-link.active { color: #c8a97e !important; border-bottom: 3px solid #c8a97e; background: transparent; }
+        .table { background-color: #ffffff; }
+        .table thead th { background-color: #111111 !important; color: #ffffff !important; font-weight: 700; border: none; }
+        .table tbody td { color: #222222; font-weight: 500; vertical-align: middle; }
+        .form-select, .form-control { color: #000000 !important; font-weight: 600; border: 2px solid #ccc; background-color: #fff; }
+        .form-select:focus, .form-control:focus { border-color: #c8a97e; box-shadow: none; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">GRAND HOTEL</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Главная</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('food_menu') }}">Ресторан</a></li>
+                    {% if session.get('role') == 'admin' %}
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard') }}">Админ Панель</a></li>
+                    {% elif session.get('role') == 'user' %}
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('user_dashboard') }}">Мои Брони</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('profile') }}">Профиль</a></li>
+                    {% endif %}
+                    {% if session.get('role') %}
+                        <li class="nav-item ms-3">
+                            <span class="text-white small me-2">Привет, {{ session['fullname'].split()[0] }}!</span>
+                            <a class="btn btn-outline-light btn-sm rounded-0" href="{{ url_for('logout') }}">Выйти</a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item ms-3"><a class="btn btn-outline-gold btn-sm" href="{{ url_for('login') }}">Войти</a></li>
+                        <li class="nav-item ms-2"><a class="btn btn-gold btn-sm" href="{{ url_for('register') }}">Регистрация</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div style="padding-top: 76px;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show m-0 rounded-0 text-center border-0">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+    <footer class="footer">
+        <div class="container text-center">
+            <h4 class="text-white mb-3" style="font-family: 'Playfair Display', serif;">GRAND HOTEL</h4>
+            <p>ул. Морская, д. 1, Сочи<br>+7 (800) 555-35-35</p>
+            <p class="small mt-4 mb-0 text-muted">&copy; 2026 Grand Hotel. Все права защищены.</p>
+        </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
