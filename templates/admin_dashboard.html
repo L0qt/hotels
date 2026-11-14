@@ -3,14 +3,31 @@
 <div class="container-fluid my-4 px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="display-6">Панель Администратора</h1>
-        <div class="d-flex align-items-center gap-3">
-            <div class="alert alert-success mb-0 py-2 px-3 shadow-sm">
-                <strong>Выручка:</strong> {{ "%.2f"|format(revenue) }} ₽
-            </div>
-            <!-- НОВАЯ КНОПКА МАССОВОГО ПОДНЯТИЯ ЦЕН -->
-            <a href="{{ url_for('admin_apply_min_prices') }}" class="btn btn-danger fw-bold shadow-sm" onclick="return confirm('Все цены ниже минимальных (1000₽ для номеров и 200₽ для блюд) будут принудительно повышены. Продолжить?')">
-                ⚡ Поднять цены до минимума
-            </a>
+        <div class="alert alert-success mb-0 py-2 px-3 shadow-sm">
+            <strong>Выручка:</strong> {{ "%.2f"|format(revenue) }} ₽
+        </div>
+    </div>
+
+    <!-- БЛОК НАСТРОЙКИ МИНИМАЛЬНЫХ ЦЕН -->
+    <div class="card shadow-sm border-warning mb-4">
+        <div class="card-body bg-light">
+            <h5 class="card-title text-warning fw-bold"><i class="bi bi-sliders"></i> Настройки минимальных цен</h5>
+            <p class="text-muted small mb-3">Все продукты с ценой ниже указанной автоматически подорожают до этих значений.</p>
+            <form method="POST" action="{{ url_for('admin_update_min_prices') }}" class="row align-items-end">
+                <div class="col-md-4">
+                    <label class="fw-bold">Мин. цена для Номеров (₽):</label>
+                    <input type="number" name="min_room" class="form-control" value="{{ min_room_price }}" step="1" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="fw-bold">Мин. цена для Блюд (₽):</label>
+                    <input type="number" name="min_menu" class="form-control" value="{{ min_menu_price }}" step="1" required>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-warning text-dark fw-bold w-100" onclick="return confirm('Применить новые лимиты и автоматически поднять дешевые позиции?')">
+                        💾 Сохранить и применить
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
