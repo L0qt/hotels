@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import sqlite3
 import os
+import uuid
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -86,7 +87,8 @@ class DatabaseManager:
         paths = []
         for file in files:
             if file and file.filename:
-                filename = secure_filename(file.filename)
+                ext = os.path.splitext(file.filename)[1].lower()
+                filename = f"{uuid.uuid4().hex}{ext}"
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(filepath)
                 paths.append(f'/static/uploads/{filename}')
@@ -128,6 +130,13 @@ class DatabaseManager:
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE rooms SET title=?, price=?, description=?, images=?, amenities=? WHERE id=?", (title, price, description, images, amenities, room_id))
             conn.commit()
+            
+    # НОВЫЙ МЕТОД ДЛЯ МАССОВОГО ОБНОВЛЕНИЯ
+    def update_room_price_title(self, room_id, title, price):
+        with self.get_connection() as conn:
+            conn.cursor().execute("UPDATE rooms SET title = ?, price = ? WHERE id = ?", (title, price, room_id))
+            conn.commit()
+
     def delete_room(self, room_id):
         with self.get_connection() as conn:
             conn.cursor().execute("DELETE FROM rooms WHERE id = ?", (room_id,))
@@ -201,16 +210,13 @@ class DatabaseManager:
 
 db = DatabaseManager()
 
-
 # ─────────────────────────────────────────────────────────────
 # ОПОВЕЩЕНИЯ О ЗАЕЗДЕ / ВЫЕЗДЕ
 # ─────────────────────────────────────────────────────────────
 ACTIVE_BOOKING_STATUSES = ('Забронировано', 'Оплачено')
 CHECK_IN_REMIND_DAYS = 3
 
-
 def get_user_notifications(bookings):
-    """Формирует список оповещений о заезде/выезде для гостя."""
     today = datetime.now().date()
     notifications = []
 
@@ -228,52 +234,20 @@ def get_user_notifications(bookings):
         days_to_in = (check_in - today).days
         days_to_out = (check_out - today).days
 
-        # ── Оповещения о заезде ──
         if days_to_in == 0:
-            notifications.append({
-                'type': 'warning',
-                'icon': '🔑',
-                'title': 'Заезд сегодня',
-                'message': f'Сегодня заезд в номер «{room_title}». '
-                           f'Возьмите документы и подтвердите бронь на ресепшене (заезд с 14:00).',
-                'booking_id': b['id'],
-            })
+            notifications.append({'type': 'warning', 'icon': '🔑', 'title': 'Заезд сегодня', 'message': f'Сегодня заезд в номер «{room_title}». Возьмите документы и подтвердите бронь на ресепшене (заезд с 14:00).', 'booking_id': b['id']})
         elif 0 < days_to_in <= CHECK_IN_REMIND_DAYS:
-            notifications.append({
-                'type': 'info',
-                'icon': '📅',
-                'title': 'Скоро заезд',
-                'message': f'Напоминание: заезд в номер «{room_title}» через {days_to_in} дн. '
-                           f'({b["check_in"]}).',
-                'booking_id': b['id'],
-            })
+            notifications.append({'type': 'info', 'icon': '📅', 'title': 'Скоро заезд', 'message': f'Напоминание: заезд в номер «{room_title}» через {days_to_in} дн. ({b["check_in"]}).', 'booking_id': b['id']})
 
-        # ── Оповещения о выезде ──
         if days_to_out == 0 and today >= check_in:
-            notifications.append({
-                'type': 'danger',
-                'icon': '🚪',
-                'title': 'Выезд сегодня',
-                'message': f'Сегодня выезд из номера «{room_title}». '
-                           f'Освободите номер до 12:00.',
-                'booking_id': b['id'],
-            })
+            notifications.append({'type': 'danger', 'icon': '🚪', 'title': 'Выезд сегодня', 'message': f'Сегодня выезд из номера «{room_title}». Освободите номер до 12:00.', 'booking_id': b['id']})
         elif days_to_out > 0 and check_in <= today < check_out:
-            notifications.append({
-                'type': 'success',
-                'icon': '🏨',
-                'title': 'Вы проживаете в отеле',
-                'message': f'Номер «{room_title}». Выезд через {days_to_out} дн. '
-                           f'({b["check_out"]}).',
-                'booking_id': b['id'],
-            })
+            notifications.append({'type': 'success', 'icon': '🏨', 'title': 'Вы проживаете в отеле', 'message': f'Номер «{room_title}». Выезд через {days_to_out} дн. ({b["check_out"]}).', 'booking_id': b['id']})
 
     return notifications
 
-
 @app.context_processor
 def inject_notifications():
-    """Делает `notifications` доступными во всех шаблонах для авторизованного гостя."""
     if session.get('role') == 'user':
         try:
             bookings = db.get_user_bookings(session['user_id'])
@@ -282,6 +256,9 @@ def inject_notifications():
             return {'notifications': []}
     return {'notifications': []}
 
+# ─────────────────────────────────────────────────────────────
+# МАРШРУТЫ
+# ─────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
@@ -384,6 +361,28 @@ def admin_dashboard():
                            users=db.get_all_users(), rooms=db.get_all_rooms(), menu=db.get_all_menu(),
                            bookings=bookings, food_orders=db.get_all_food_orders(), 
                            reviews=db.get_all_reviews(), revenue=sum(float(b['total_price']) for b in bookings if b['total_price']))
+
+# НОВЫЙ МАРШРУТ ДЛЯ МАССОВОГО РЕДАКТИРОВАНИЯ
+@app.route('/admin/batch_edit_rooms', methods=['GET', 'POST'])
+def admin_batch_edit_rooms():
+    if session.get('role') != 'admin': return "Доступ запрещен", 403
+
+    if request.method == 'POST':
+        selected_ids = request.form.getlist('selected_rooms')
+        if not selected_ids:
+            flash('Вы не выбрали ни одного номера!', 'warning')
+            return redirect(url_for('admin_batch_edit_rooms'))
+
+        for room_id in selected_ids:
+            title = request.form.get(f'title_{room_id}')
+            price = request.form.get(f'price_{room_id}')
+            if title and price:
+                db.update_room_price_title(room_id, title, float(price))
+                
+        flash(f'Успешно обновлено номеров: {len(selected_ids)}', 'success')
+        return redirect(url_for('admin_dashboard'))
+
+    return render_template('admin_batch_edit.html', rooms=db.get_all_rooms())
 
 @app.route('/admin/add_room', methods=['GET', 'POST'])
 def admin_add_room():
