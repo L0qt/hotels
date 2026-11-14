@@ -55,6 +55,16 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS settings (
                     key TEXT PRIMARY KEY, value REAL
                 );
+                -- НОВАЯ ТАБЛИЦА ДЛЯ ИСТОРИИ ИЗМЕНЕНИЯ ЦЕН
+                CREATE TABLE IF NOT EXISTS price_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                    batch_id TEXT, 
+                    item_type TEXT, 
+                    item_id INTEGER, 
+                    old_price REAL, 
+                    new_price REAL, 
+                    date TEXT
+                );
             """)
             
             # Миграции
@@ -66,7 +76,6 @@ class DatabaseManager:
             if not cursor.execute("SELECT * FROM settings WHERE key = 'min_menu_price'").fetchone():
                 cursor.execute("INSERT INTO settings (key, value) VALUES ('min_menu_price', 200.0)")
 
-            # Пользователи и номера
             if not cursor.execute("SELECT * FROM users WHERE username = 'admin'").fetchone():
                 cursor.execute("INSERT INTO users (username, password, role, fullname) VALUES (?, ?, ?, ?)",
                                ('admin', generate_password_hash('admin'), 'admin', 'Главный Администратор'))
@@ -89,14 +98,12 @@ class DatabaseManager:
                     (1, 2, 5, 'Отличный номер!', '2026-10-20');
                 """)
 
-            # Автоисправление цен при запуске
             min_room = cursor.execute("SELECT value FROM settings WHERE key = 'min_room_price'").fetchone()[0]
             min_menu = cursor.execute("SELECT value FROM settings WHERE key = 'min_menu_price'").fetchone()[0]
             cursor.execute("UPDATE rooms SET price = ? WHERE price < ?", (min_room, min_room))
             cursor.execute("UPDATE menu SET price = ? WHERE price < ?", (min_menu, min_menu))
             conn.commit()
 
-    # НОВЫЕ МЕТОДЫ ДЛЯ РАБОТЫ С НАСТРОЙКАМИ ЦЕН
     def get_min_price(self, key):
         with self.get_connection() as conn:
             res = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
@@ -106,6 +113,30 @@ class DatabaseManager:
         with self.get_connection() as conn:
             conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
             conn.commit()
+
+    def get_price_history(self):
+        with self.get_connection() as conn:
+            return conn.execute("""
+                SELECT batch_id, date, 
+                SUM(CASE WHEN item_type = 'room' THEN 1 ELSE 0 END) as rooms_changed,
+                SUM(CASE WHEN item_type = 'menu' THEN 1 ELSE 0 END) as menu_changed
+                FROM price_history 
+                GROUP BY batch_id 
+                ORDER BY date DESC LIMIT 10
+            """).fetchall()
+
+    def revert_price_history(self, batch_id):
+        with self.get_connection() as conn:
+            items = conn.execute("SELECT * FROM price_history WHERE batch_id = ?", (batch_id,)).fetchall()
+            for item in items:
+                if item['item_type'] == 'room':
+                    conn.execute("UPDATE rooms SET price = ? WHERE id = ?", (item['old_price'], item['item_id']))
+                elif item['item_type'] == 'menu':
+                    conn.execute("UPDATE menu SET price = ? WHERE id = ?", (item['old_price'], item['item_id']))
+            
+            conn.execute("DELETE FROM price_history WHERE batch_id = ?", (batch_id,))
+            conn.commit()
+            return len(items)
 
     def save_files(self, files):
         paths = []
@@ -146,28 +177,24 @@ class DatabaseManager:
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM rooms").fetchall()
     def get_room(self, room_id):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM rooms WHERE id = ?", (room_id,)).fetchone()
-    
     def add_room(self, title, price, description, images, amenities):
         min_p = self.get_min_price('min_room_price')
         price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO rooms (title, price, description, images, amenities) VALUES (?, ?, ?, ?, ?)", (title, price, description, images, amenities))
             conn.commit()
-            
     def update_room(self, room_id, title, price, description, images, amenities):
         min_p = self.get_min_price('min_room_price')
         price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE rooms SET title=?, price=?, description=?, images=?, amenities=? WHERE id=?", (title, price, description, images, amenities, room_id))
             conn.commit()
-            
     def update_room_price_title(self, room_id, title, price):
         min_p = self.get_min_price('min_room_price')
         price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE rooms SET title = ?, price = ? WHERE id = ?", (title, price, room_id))
             conn.commit()
-            
     def delete_room(self, room_id):
         with self.get_connection() as conn:
             conn.cursor().execute("DELETE FROM rooms WHERE id = ?", (room_id,))
@@ -177,28 +204,24 @@ class DatabaseManager:
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu").fetchall()
     def get_menu_item(self, item_id):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu WHERE id = ?", (item_id,)).fetchone()
-    
     def add_menu_item(self, name, price, description, image, ingredients):
         min_p = self.get_min_price('min_menu_price')
         price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO menu (name, price, description, image, ingredients) VALUES (?, ?, ?, ?, ?)", (name, price, description, image, ingredients))
             conn.commit()
-            
     def update_menu_item(self, item_id, name, price, description, image, ingredients):
         min_p = self.get_min_price('min_menu_price')
         price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE menu SET name=?, price=?, description=?, image=?, ingredients=? WHERE id=?", (name, price, description, image, ingredients, item_id))
             conn.commit()
-            
     def update_menu_price_name(self, item_id, name, price):
         min_p = self.get_min_price('min_menu_price')
         price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE menu SET name = ?, price = ? WHERE id = ?", (name, price, item_id))
             conn.commit()
-            
     def delete_menu_item(self, item_id):
         with self.get_connection() as conn:
             conn.cursor().execute("DELETE FROM menu WHERE id = ?", (item_id,))
@@ -394,9 +417,10 @@ def admin_dashboard():
                            bookings=bookings, food_orders=db.get_all_food_orders(), 
                            reviews=db.get_all_reviews(), revenue=sum(float(b['total_price']) for b in bookings if b['total_price']),
                            min_room_price=db.get_min_price('min_room_price'),
-                           min_menu_price=db.get_min_price('min_menu_price'))
+                           min_menu_price=db.get_min_price('min_menu_price'),
+                           price_history=db.get_price_history())
 
-# НОВЫЙ МАРШРУТ ДЛЯ ОБНОВЛЕНИЯ МИНИМАЛЬНЫХ ЦЕН
+# ОБНОВЛЕННЫЙ МАРШРУТ С СОХРАНЕНИЕМ ИСТОРИИ
 @app.route('/admin/update_min_prices', methods=['POST'])
 def admin_update_min_prices():
     if session.get('role') != 'admin': return "Доступ запрещен", 403
@@ -407,13 +431,35 @@ def admin_update_min_prices():
     db.update_min_price('min_room_price', min_room)
     db.update_min_price('min_menu_price', min_menu)
     
-    # Принудительно обновляем текущие позиции
+    batch_id = datetime.now().strftime('%Y%m%d%H%M%S')
+    now = datetime.now().strftime('%Y-%m-%d %H:%M')
+
     with db.get_connection() as conn:
+        # Сохраняем историю для комнат
+        rooms = conn.execute("SELECT id, price FROM rooms WHERE price < ?", (min_room,)).fetchall()
+        for r in rooms:
+            conn.execute("INSERT INTO price_history (batch_id, item_type, item_id, old_price, new_price, date) VALUES (?, 'room', ?, ?, ?, ?)", 
+                         (batch_id, r['id'], r['price'], min_room, now))
         conn.execute("UPDATE rooms SET price = ? WHERE price < ?", (min_room, min_room))
+
+        # Сохраняем историю для меню
+        items = conn.execute("SELECT id, price FROM menu WHERE price < ?", (min_menu,)).fetchall()
+        for i in items:
+            conn.execute("INSERT INTO price_history (batch_id, item_type, item_id, old_price, new_price, date) VALUES (?, 'menu', ?, ?, ?, ?)", 
+                         (batch_id, i['id'], i['price'], min_menu, now))
         conn.execute("UPDATE menu SET price = ? WHERE price < ?", (min_menu, min_menu))
         conn.commit()
         
-    flash('Минимальные цены обновлены, а все дешевые позиции автоматически подорожали!', 'success')
+    flash(f'Минимальные цены обновлены! Изменено номеров: {len(rooms)}, блюд: {len(items)}.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+# НОВЫЙ МАРШРУТ ДЛЯ ОТМЕНЫ ИЗМЕНЕНИЙ
+@app.route('/admin/revert_prices/<batch_id>')
+def admin_revert_prices(batch_id):
+    if session.get('role') != 'admin': return "Доступ запрещен", 403
+    
+    count = db.revert_price_history(batch_id)
+    flash(f'Изменения отменены! Возвращены старые цены для {count} позиций.', 'info')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/batch_edit_rooms', methods=['GET', 'POST'])
