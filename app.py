@@ -54,12 +54,13 @@ class DatabaseManager:
                 );
             """)
             
-            # АВТОМАТИЧЕСКАЯ МИГРАЦИЯ БАЗЫ ДАННЫХ (ДОБАВЛЯЕМ ИНГРЕДИЕНТЫ)
+            # Автоматическая миграция для ингредиентов
             try:
                 cursor.execute("ALTER TABLE menu ADD COLUMN ingredients TEXT DEFAULT ''")
             except sqlite3.OperationalError:
-                pass # Колонка уже существует
+                pass
             
+            # ДОБАВЛЯЕМ СТАНДАРТНЫХ ПОЛЬЗОВАТЕЛЕЙ И НОМЕРА
             if not cursor.execute("SELECT * FROM users WHERE username = 'admin'").fetchone():
                 cursor.execute("INSERT INTO users (username, password, role, fullname) VALUES (?, ?, ?, ?)",
                                ('admin', generate_password_hash('admin'), 'admin', 'Главный Администратор'))
@@ -86,6 +87,11 @@ class DatabaseManager:
                     (1, 2, 5, 'Отличный номер, всё чисто и уютно!', '2026-10-20'),
                     (2, 1, 5, 'Вид на море просто потрясающий!', '2026-10-21');
                 """)
+
+            # АВТОМАТИЧЕСКОЕ ИСПРАВЛЕНИЕ ЦЕН ПРИ ЗАПУСКЕ
+            cursor.execute("UPDATE rooms SET price = 1000.0 WHERE price < 1000.0")
+            cursor.execute("UPDATE menu SET price = 200.0 WHERE price < 200.0")
+            
             conn.commit()
 
     def save_files(self, files):
@@ -342,16 +348,12 @@ def food_menu():
 def order_food():
     if session.get('role') != 'user': return "Доступ запрещен", 403
     base_name = request.form['item_name']
-    
-    # Собираем ингредиенты
     selected_ing = request.form.getlist('ingredients')
     custom_ing = request.form.get('custom_ingredients', '').strip()
     extras = selected_ing + ([custom_ing] if custom_ing else [])
-    
     final_name = base_name
     if extras:
         final_name += f" (Доп: {', '.join(extras)})"
-        
     db.add_food_order(session['user_id'], request.form['room_id'], final_name, float(request.form['price']), int(request.form['quantity']))
     flash('Заказ принят! Ожидайте доставку.', 'success')
     return redirect(url_for('user_dashboard'))
@@ -364,6 +366,17 @@ def admin_dashboard():
                            users=db.get_all_users(), rooms=db.get_all_rooms(), menu=db.get_all_menu(),
                            bookings=bookings, food_orders=db.get_all_food_orders(), 
                            reviews=db.get_all_reviews(), revenue=sum(float(b['total_price']) for b in bookings if b['total_price']))
+
+# НОВЫЙ МАРШРУТ ДЛЯ ПРИНУДИТЕЛЬНОГО ПОВЫШЕНИЯ ЦЕН
+@app.route('/admin/apply_min_prices')
+def admin_apply_min_prices():
+    if session.get('role') != 'admin': return "Доступ запрещен", 403
+    with db.get_connection() as conn:
+        conn.execute("UPDATE rooms SET price = 1000.0 WHERE price < 1000.0")
+        conn.execute("UPDATE menu SET price = 200.0 WHERE price < 200.0")
+        conn.commit()
+    flash('Все цены ниже минимальных были автоматически повышены (Номера: 1000 ₽, Блюда: 200 ₽)!', 'success')
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/batch_edit_rooms', methods=['GET', 'POST'])
 def admin_batch_edit_rooms():
