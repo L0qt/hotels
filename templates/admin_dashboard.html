@@ -8,6 +8,64 @@
         </div>
     </div>
 
+    <!-- БЛОК НАСТРОЙКИ МИНИМАЛЬНЫХ ЦЕН -->
+    <div class="card shadow-sm border-warning mb-4">
+        <div class="card-body bg-light">
+            <h5 class="card-title text-warning fw-bold"><i class="bi bi-sliders"></i> Настройки минимальных цен</h5>
+            <p class="text-muted small mb-3">Все продукты с ценой ниже указанной автоматически подорожают до этих значений.</p>
+            <form method="POST" action="{{ url_for('admin_update_min_prices') }}" class="row align-items-end">
+                <div class="col-md-4">
+                    <label class="fw-bold">Мин. цена для Номеров (₽):</label>
+                    <input type="number" name="min_room" class="form-control" value="{{ min_room_price }}" step="1" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="fw-bold">Мин. цена для Блюд (₽):</label>
+                    <input type="number" name="min_menu" class="form-control" value="{{ min_menu_price }}" step="1" required>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-warning text-dark fw-bold w-100" onclick="return confirm('Применить новые лимиты и автоматически поднять дешевые позиции?')">
+                        💾 Сохранить и применить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ИСТОРИЯ ИЗМЕНЕНИЙ ЦЕН -->
+    {% if price_history %}
+    <div class="card shadow-sm border-secondary mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h6 class="mb-0">🕒 История изменений минимальных цен</h6>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Дата и время</th>
+                        <th>Изменено номеров</th>
+                        <th>Изменено блюд</th>
+                        <th class="text-end">Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in price_history %}
+                    <tr>
+                        <td>{{ h.date }}</td>
+                        <td><span class="badge bg-primary">{{ h.rooms_changed }}</span></td>
+                        <td><span class="badge bg-info text-dark">{{ h.menu_changed }}</span></td>
+                        <td class="text-end">
+                            <a href="{{ url_for('admin_revert_prices', batch_id=h.batch_id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Вы уверены, что хотите отменить это изменение и вернуть старые цены?')">
+                                ⏪ Отменить
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
     <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
         <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#bookings">Брони</button></li>
         <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#rooms">Номера</button></li>
@@ -123,7 +181,6 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4>Меню ресторана</h4>
                 <div>
-                    <!-- НОВАЯ КНОПКА МАССОВОГО ИЗМЕНЕНИЯ ДЛЯ МЕНЮ -->
                     <a href="{{ url_for('admin_batch_edit_menu') }}" class="btn btn-warning fw-bold shadow-sm">⚡ Массовое изменение</a>
                     <a href="{{ url_for('admin_add_menu') }}" class="btn btn-success shadow-sm ms-2">+ Добавить блюдо</a>
                 </div>
