@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Массовое редактирование меню</h2>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">Назад в панель</a>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <form method="POST">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 50px;" class="text-center">
+                                <input type="checkbox" class="form-check-input" onclick="toggleAll(this)" title="Выбрать все">
+                            </th>
+                            <th>ID</th>
+                            <th>Название блюда</th>
+                            <th>Цена (₽)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in menu %}
+                        <tr>
+                            <td class="text-center">
+                                <input type="checkbox" name="selected_items" value="{{ item.id }}" class="form-check-input item-checkbox">
+                            </td>
+                            <td>{{ item.id }}</td>
+                            <td>
+                                <input type="text" name="name_{{ item.id }}" value="{{ item.name }}" class="form-control form-control-sm">
+                            </td>
+                            <td>
+                                <input type="number" name="price_{{ item.id }}" value="{{ item.price }}" class="form-control form-control-sm" step="0.01">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <div class="p-3 bg-light border-top text-end">
+                    <button type="submit" class="btn btn-success px-4">💾 Сохранить выбранные</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleAll(source) {
+        checkboxes = document.querySelectorAll('.item-checkbox');
+        for(var i=0, n=checkboxes.length;i<n;i++) {
+            checkboxes[i].checked = source.checked;
+        }
+    }
+</script>
+{% endblock %}
