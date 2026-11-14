@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import sqlite3
 import os
+import uuid
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 from datetime import datetime
 
 app = Flask(__name__)
@@ -52,8 +52,30 @@ class DatabaseManager:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, room_id INTEGER,
                     item_name TEXT, price REAL, quantity INTEGER, status TEXT DEFAULT 'Готовится', date TEXT
                 );
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY, value REAL
+                );
+                -- НОВАЯ ТАБЛИЦА ДЛЯ ИСТОРИИ ИЗМЕНЕНИЯ ЦЕН
+                CREATE TABLE IF NOT EXISTS price_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                    batch_id TEXT, 
+                    item_type TEXT, 
+                    item_id INTEGER, 
+                    old_price REAL, 
+                    new_price REAL, 
+                    date TEXT
+                );
             """)
             
+            # Миграции
+            try: cursor.execute("ALTER TABLE menu ADD COLUMN ingredients TEXT DEFAULT ''")
+            except sqlite3.OperationalError: pass
+            
+            if not cursor.execute("SELECT * FROM settings WHERE key = 'min_room_price'").fetchone():
+                cursor.execute("INSERT INTO settings (key, value) VALUES ('min_room_price', 1000.0)")
+            if not cursor.execute("SELECT * FROM settings WHERE key = 'min_menu_price'").fetchone():
+                cursor.execute("INSERT INTO settings (key, value) VALUES ('min_menu_price', 200.0)")
+
             if not cursor.execute("SELECT * FROM users WHERE username = 'admin'").fetchone():
                 cursor.execute("INSERT INTO users (username, password, role, fullname) VALUES (?, ?, ?, ?)",
                                ('admin', generate_password_hash('admin'), 'admin', 'Главный Администратор'))
@@ -65,28 +87,63 @@ class DatabaseManager:
             if cursor.execute("SELECT COUNT(*) FROM rooms").fetchone()[0] == 0:
                 cursor.execute("INSERT INTO rooms (title, price, description, images, amenities) VALUES (?, ?, ?, ?, ?)",
                                ('Стандартный номер', 3500.0, 'Уютный номер с одной большой кроватью.', '/static/placeholder.jpg', 'Wi-Fi, Кондиционер, ТВ, Мини-бар'))
-                cursor.execute("INSERT INTO rooms (title, price, description, images, amenities) VALUES (?, ?, ?, ?, ?)",
-                               ('Люкс с видом на море', 12000.0, 'Роскошный номер с панорамными окнами и джакузи.', '/static/placeholder.jpg', 'Wi-Fi, Джакузи, Панорамный вид, Завтрак включен'))
             
             if cursor.execute("SELECT COUNT(*) FROM menu").fetchone()[0] == 0:
-                cursor.execute("INSERT INTO menu (name, price, description, image) VALUES (?, ?, ?, ?)",
-                               ('Круассан с лососем', 650.0, 'Свежий круассан, сливочный сыр, лосось', '/static/placeholder.jpg'))
-                cursor.execute("INSERT INTO menu (name, price, description, image) VALUES (?, ?, ?, ?)",
-                               ('Стейк Рибай', 2500.0, 'Мраморная говядина, овощи гриль', '/static/placeholder.jpg'))
+                cursor.execute("INSERT INTO menu (name, price, description, image, ingredients) VALUES (?, ?, ?, ?, ?)",
+                               ('Круассан с лососем', 650.0, 'Свежий круассан', '/static/placeholder.jpg', 'Сыр, Лосось'))
             
             if cursor.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 0:
                 cursor.executescript("""
                     INSERT INTO reviews (room_id, user_id, rating, comment, date) VALUES 
-                    (1, 2, 5, 'Отличный номер, всё чисто и уютно!', '2026-10-20'),
-                    (2, 1, 5, 'Вид на море просто потрясающий!', '2026-10-21');
+                    (1, 2, 5, 'Отличный номер!', '2026-10-20');
                 """)
+
+            min_room = cursor.execute("SELECT value FROM settings WHERE key = 'min_room_price'").fetchone()[0]
+            min_menu = cursor.execute("SELECT value FROM settings WHERE key = 'min_menu_price'").fetchone()[0]
+            cursor.execute("UPDATE rooms SET price = ? WHERE price < ?", (min_room, min_room))
+            cursor.execute("UPDATE menu SET price = ? WHERE price < ?", (min_menu, min_menu))
             conn.commit()
+
+    def get_min_price(self, key):
+        with self.get_connection() as conn:
+            res = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+            return res['value'] if res else (1000.0 if key == 'min_room_price' else 200.0)
+
+    def update_min_price(self, key, value):
+        with self.get_connection() as conn:
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+            conn.commit()
+
+    def get_price_history(self):
+        with self.get_connection() as conn:
+            return conn.execute("""
+                SELECT batch_id, date, 
+                SUM(CASE WHEN item_type = 'room' THEN 1 ELSE 0 END) as rooms_changed,
+                SUM(CASE WHEN item_type = 'menu' THEN 1 ELSE 0 END) as menu_changed
+                FROM price_history 
+                GROUP BY batch_id 
+                ORDER BY date DESC LIMIT 10
+            """).fetchall()
+
+    def revert_price_history(self, batch_id):
+        with self.get_connection() as conn:
+            items = conn.execute("SELECT * FROM price_history WHERE batch_id = ?", (batch_id,)).fetchall()
+            for item in items:
+                if item['item_type'] == 'room':
+                    conn.execute("UPDATE rooms SET price = ? WHERE id = ?", (item['old_price'], item['item_id']))
+                elif item['item_type'] == 'menu':
+                    conn.execute("UPDATE menu SET price = ? WHERE id = ?", (item['old_price'], item['item_id']))
+            
+            conn.execute("DELETE FROM price_history WHERE batch_id = ?", (batch_id,))
+            conn.commit()
+            return len(items)
 
     def save_files(self, files):
         paths = []
         for file in files:
             if file and file.filename:
-                filename = secure_filename(file.filename)
+                ext = os.path.splitext(file.filename)[1].lower()
+                filename = f"{uuid.uuid4().hex}{ext}"
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(filepath)
                 paths.append(f'/static/uploads/{filename}')
@@ -121,12 +178,22 @@ class DatabaseManager:
     def get_room(self, room_id):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM rooms WHERE id = ?", (room_id,)).fetchone()
     def add_room(self, title, price, description, images, amenities):
+        min_p = self.get_min_price('min_room_price')
+        price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO rooms (title, price, description, images, amenities) VALUES (?, ?, ?, ?, ?)", (title, price, description, images, amenities))
             conn.commit()
     def update_room(self, room_id, title, price, description, images, amenities):
+        min_p = self.get_min_price('min_room_price')
+        price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE rooms SET title=?, price=?, description=?, images=?, amenities=? WHERE id=?", (title, price, description, images, amenities, room_id))
+            conn.commit()
+    def update_room_price_title(self, room_id, title, price):
+        min_p = self.get_min_price('min_room_price')
+        price = max(float(price), min_p)
+        with self.get_connection() as conn:
+            conn.cursor().execute("UPDATE rooms SET title = ?, price = ? WHERE id = ?", (title, price, room_id))
             conn.commit()
     def delete_room(self, room_id):
         with self.get_connection() as conn:
@@ -137,13 +204,23 @@ class DatabaseManager:
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu").fetchall()
     def get_menu_item(self, item_id):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu WHERE id = ?", (item_id,)).fetchone()
-    def add_menu_item(self, name, price, description, image):
+    def add_menu_item(self, name, price, description, image, ingredients):
+        min_p = self.get_min_price('min_menu_price')
+        price = max(float(price), min_p)
         with self.get_connection() as conn:
-            conn.cursor().execute("INSERT INTO menu (name, price, description, image) VALUES (?, ?, ?, ?)", (name, price, description, image))
+            conn.cursor().execute("INSERT INTO menu (name, price, description, image, ingredients) VALUES (?, ?, ?, ?, ?)", (name, price, description, image, ingredients))
             conn.commit()
-    def update_menu_item(self, item_id, name, price, description, image):
+    def update_menu_item(self, item_id, name, price, description, image, ingredients):
+        min_p = self.get_min_price('min_menu_price')
+        price = max(float(price), min_p)
         with self.get_connection() as conn:
-            conn.cursor().execute("UPDATE menu SET name=?, price=?, description=?, image=? WHERE id=?", (name, price, description, image, item_id))
+            conn.cursor().execute("UPDATE menu SET name=?, price=?, description=?, image=?, ingredients=? WHERE id=?", (name, price, description, image, ingredients, item_id))
+            conn.commit()
+    def update_menu_price_name(self, item_id, name, price):
+        min_p = self.get_min_price('min_menu_price')
+        price = max(float(price), min_p)
+        with self.get_connection() as conn:
+            conn.cursor().execute("UPDATE menu SET name = ?, price = ? WHERE id = ?", (name, price, item_id))
             conn.commit()
     def delete_menu_item(self, item_id):
         with self.get_connection() as conn:
@@ -201,91 +278,40 @@ class DatabaseManager:
 
 db = DatabaseManager()
 
-
-# ─────────────────────────────────────────────────────────────
-# ОПОВЕЩЕНИЯ О ЗАЕЗДЕ / ВЫЕЗДЕ
-# ─────────────────────────────────────────────────────────────
 ACTIVE_BOOKING_STATUSES = ('Забронировано', 'Оплачено')
 CHECK_IN_REMIND_DAYS = 3
 
-
 def get_user_notifications(bookings):
-    """Формирует список оповещений о заезде/выезде для гостя."""
     today = datetime.now().date()
     notifications = []
-
     for b in bookings:
-        if b['status'] not in ACTIVE_BOOKING_STATUSES:
-            continue
-
+        if b['status'] not in ACTIVE_BOOKING_STATUSES: continue
         try:
             check_in = datetime.strptime(b['check_in'], '%Y-%m-%d').date()
             check_out = datetime.strptime(b['check_out'], '%Y-%m-%d').date()
-        except (ValueError, TypeError):
-            continue
-
+        except (ValueError, TypeError): continue
         room_title = b['title'] or f"№{b['room_id']}"
         days_to_in = (check_in - today).days
         days_to_out = (check_out - today).days
-
-        # ── Оповещения о заезде ──
         if days_to_in == 0:
-            notifications.append({
-                'type': 'warning',
-                'icon': '🔑',
-                'title': 'Заезд сегодня',
-                'message': f'Сегодня заезд в номер «{room_title}». '
-                           f'Возьмите документы и подтвердите бронь на ресепшене (заезд с 14:00).',
-                'booking_id': b['id'],
-            })
+            notifications.append({'type': 'warning', 'icon': '🔑', 'title': 'Заезд сегодня', 'message': f'Сегодня заезд в номер «{room_title}». Возьмите документы на ресепшен.', 'booking_id': b['id']})
         elif 0 < days_to_in <= CHECK_IN_REMIND_DAYS:
-            notifications.append({
-                'type': 'info',
-                'icon': '📅',
-                'title': 'Скоро заезд',
-                'message': f'Напоминание: заезд в номер «{room_title}» через {days_to_in} дн. '
-                           f'({b["check_in"]}).',
-                'booking_id': b['id'],
-            })
-
-        # ── Оповещения о выезде ──
+            notifications.append({'type': 'info', 'icon': '📅', 'title': 'Скоро заезд', 'message': f'Напоминание: заезд в номер «{room_title}» через {days_to_in} дн. ({b["check_in"]}).', 'booking_id': b['id']})
         if days_to_out == 0 and today >= check_in:
-            notifications.append({
-                'type': 'danger',
-                'icon': '🚪',
-                'title': 'Выезд сегодня',
-                'message': f'Сегодня выезд из номера «{room_title}». '
-                           f'Освободите номер до 12:00.',
-                'booking_id': b['id'],
-            })
+            notifications.append({'type': 'danger', 'icon': '🚪', 'title': 'Выезд сегодня', 'message': f'Сегодня выезд из номера «{room_title}». Освободите номер до 12:00.', 'booking_id': b['id']})
         elif days_to_out > 0 and check_in <= today < check_out:
-            notifications.append({
-                'type': 'success',
-                'icon': '🏨',
-                'title': 'Вы проживаете в отеле',
-                'message': f'Номер «{room_title}». Выезд через {days_to_out} дн. '
-                           f'({b["check_out"]}).',
-                'booking_id': b['id'],
-            })
-
+            notifications.append({'type': 'success', 'icon': '🏨', 'title': 'Вы проживаете в отеле', 'message': f'Номер «{room_title}». Выезд через {days_to_out} дн. ({b["check_out"]}).', 'booking_id': b['id']})
     return notifications
-
 
 @app.context_processor
 def inject_notifications():
-    """Делает `notifications` доступными во всех шаблонах для авторизованного гостя."""
     if session.get('role') == 'user':
-        try:
-            bookings = db.get_user_bookings(session['user_id'])
-            return {'notifications': get_user_notifications(bookings)}
-        except Exception:
-            return {'notifications': []}
+        try: return {'notifications': get_user_notifications(db.get_user_bookings(session['user_id']))}
+        except Exception: return {'notifications': []}
     return {'notifications': []}
 
-
 @app.route('/')
-def index():
-    return render_template('index.html', rooms=db.get_all_rooms(), reviews=db.get_all_reviews()[:3])
+def index(): return render_template('index.html', rooms=db.get_all_rooms(), reviews=db.get_all_reviews()[:3])
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -340,8 +366,7 @@ def book_room(room_id):
         return redirect(url_for('login'))
     room = db.get_room(room_id)
     check_in, check_out = request.form['check_in'], request.form['check_out']
-    try:
-        days = max((datetime.strptime(check_out, '%Y-%m-%d') - datetime.strptime(check_in, '%Y-%m-%d')).days, 1)
+    try: days = max((datetime.strptime(check_out, '%Y-%m-%d') - datetime.strptime(check_in, '%Y-%m-%d')).days, 1)
     except: days = 1
     db.add_booking(room_id, session['user_id'], check_in, check_out, room['price'] * days)
     flash(f'Номер "{room["title"]}" успешно забронирован!', 'success')
@@ -372,7 +397,14 @@ def food_menu():
 @app.route('/food/order', methods=['POST'])
 def order_food():
     if session.get('role') != 'user': return "Доступ запрещен", 403
-    db.add_food_order(session['user_id'], request.form['room_id'], request.form['item_name'], float(request.form['price']), int(request.form['quantity']))
+    base_name = request.form['item_name']
+    selected_ing = request.form.getlist('ingredients')
+    custom_ing = request.form.get('custom_ingredients', '').strip()
+    extras = selected_ing + ([custom_ing] if custom_ing else [])
+    final_name = base_name
+    if extras:
+        final_name += f" (Доп: {', '.join(extras)})"
+    db.add_food_order(session['user_id'], request.form['room_id'], final_name, float(request.form['price']), int(request.form['quantity']))
     flash('Заказ принят! Ожидайте доставку.', 'success')
     return redirect(url_for('user_dashboard'))
 
@@ -383,7 +415,84 @@ def admin_dashboard():
     return render_template('admin_dashboard.html', 
                            users=db.get_all_users(), rooms=db.get_all_rooms(), menu=db.get_all_menu(),
                            bookings=bookings, food_orders=db.get_all_food_orders(), 
-                           reviews=db.get_all_reviews(), revenue=sum(float(b['total_price']) for b in bookings if b['total_price']))
+                           reviews=db.get_all_reviews(), revenue=sum(float(b['total_price']) for b in bookings if b['total_price']),
+                           min_room_price=db.get_min_price('min_room_price'),
+                           min_menu_price=db.get_min_price('min_menu_price'),
+                           price_history=db.get_price_history())
+
+# ОБНОВЛЕННЫЙ МАРШРУТ С СОХРАНЕНИЕМ ИСТОРИИ
+@app.route('/admin/update_min_prices', methods=['POST'])
+def admin_update_min_prices():
+    if session.get('role') != 'admin': return "Доступ запрещен", 403
+    
+    min_room = float(request.form['min_room'])
+    min_menu = float(request.form['min_menu'])
+    
+    db.update_min_price('min_room_price', min_room)
+    db.update_min_price('min_menu_price', min_menu)
+    
+    batch_id = datetime.now().strftime('%Y%m%d%H%M%S')
+    now = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    with db.get_connection() as conn:
+        # Сохраняем историю для комнат
+        rooms = conn.execute("SELECT id, price FROM rooms WHERE price < ?", (min_room,)).fetchall()
+        for r in rooms:
+            conn.execute("INSERT INTO price_history (batch_id, item_type, item_id, old_price, new_price, date) VALUES (?, 'room', ?, ?, ?, ?)", 
+                         (batch_id, r['id'], r['price'], min_room, now))
+        conn.execute("UPDATE rooms SET price = ? WHERE price < ?", (min_room, min_room))
+
+        # Сохраняем историю для меню
+        items = conn.execute("SELECT id, price FROM menu WHERE price < ?", (min_menu,)).fetchall()
+        for i in items:
+            conn.execute("INSERT INTO price_history (batch_id, item_type, item_id, old_price, new_price, date) VALUES (?, 'menu', ?, ?, ?, ?)", 
+                         (batch_id, i['id'], i['price'], min_menu, now))
+        conn.execute("UPDATE menu SET price = ? WHERE price < ?", (min_menu, min_menu))
+        conn.commit()
+        
+    flash(f'Минимальные цены обновлены! Изменено номеров: {len(rooms)}, блюд: {len(items)}.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+# НОВЫЙ МАРШРУТ ДЛЯ ОТМЕНЫ ИЗМЕНЕНИЙ
+@app.route('/admin/revert_prices/<batch_id>')
+def admin_revert_prices(batch_id):
+    if session.get('role') != 'admin': return "Доступ запрещен", 403
+    
+    count = db.revert_price_history(batch_id)
+    flash(f'Изменения отменены! Возвращены старые цены для {count} позиций.', 'info')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/batch_edit_rooms', methods=['GET', 'POST'])
+def admin_batch_edit_rooms():
+    if session.get('role') != 'admin': return "Доступ запрещен", 403
+    if request.method == 'POST':
+        selected_ids = request.form.getlist('selected_rooms')
+        if not selected_ids:
+            flash('Вы не выбрали ни одного номера!', 'warning')
+            return redirect(url_for('admin_batch_edit_rooms'))
+        for room_id in selected_ids:
+            title = request.form.get(f'title_{room_id}')
+            price = request.form.get(f'price_{room_id}')
+            if title and price: db.update_room_price_title(room_id, title, float(price))
+        flash(f'Успешно обновлено номеров: {len(selected_ids)}', 'success')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('admin_batch_edit.html', rooms=db.get_all_rooms())
+
+@app.route('/admin/batch_edit_menu', methods=['GET', 'POST'])
+def admin_batch_edit_menu():
+    if session.get('role') != 'admin': return "Доступ запрещен", 403
+    if request.method == 'POST':
+        selected_ids = request.form.getlist('selected_items')
+        if not selected_ids:
+            flash('Вы не выбрали ни одного блюда!', 'warning')
+            return redirect(url_for('admin_batch_edit_menu'))
+        for item_id in selected_ids:
+            name = request.form.get(f'name_{item_id}')
+            price = request.form.get(f'price_{item_id}')
+            if name and price: db.update_menu_price_name(item_id, name, float(price))
+        flash(f'Успешно обновлено блюд: {len(selected_ids)}', 'success')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('admin_batch_edit_menu.html', menu=db.get_all_menu())
 
 @app.route('/admin/add_room', methods=['GET', 'POST'])
 def admin_add_room():
@@ -425,7 +534,7 @@ def admin_add_menu():
     if session.get('role') != 'admin': return "Доступ запрещен", 403
     if request.method == 'POST':
         image_str = db.save_files([request.files.get('image')]) or '/static/placeholder.jpg'
-        db.add_menu_item(request.form['name'], float(request.form['price']), request.form['description'], image_str)
+        db.add_menu_item(request.form['name'], float(request.form['price']), request.form['description'], image_str, request.form.get('ingredients', ''))
         flash('Блюдо добавлено!', 'success')
         return redirect(url_for('admin_dashboard'))
     return render_template('admin_add_menu.html')
@@ -437,7 +546,7 @@ def admin_edit_menu(item_id):
     if request.method == 'POST':
         new_image = db.save_files([request.files.get('image')])
         image_str = new_image if new_image else item['image']
-        db.update_menu_item(item_id, request.form['name'], float(request.form['price']), request.form['description'], image_str)
+        db.update_menu_item(item_id, request.form['name'], float(request.form['price']), request.form['description'], image_str, request.form.get('ingredients', ''))
         flash('Блюдо обновлено!', 'success')
         return redirect(url_for('admin_dashboard'))
     return render_template('admin_edit_menu.html', item=item)
