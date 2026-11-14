@@ -54,6 +54,12 @@ class DatabaseManager:
                 );
             """)
             
+            # АВТОМАТИЧЕСКАЯ МИГРАЦИЯ БАЗЫ ДАННЫХ (ДОБАВЛЯЕМ ИНГРЕДИЕНТЫ)
+            try:
+                cursor.execute("ALTER TABLE menu ADD COLUMN ingredients TEXT DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass # Колонка уже существует
+            
             if not cursor.execute("SELECT * FROM users WHERE username = 'admin'").fetchone():
                 cursor.execute("INSERT INTO users (username, password, role, fullname) VALUES (?, ?, ?, ?)",
                                ('admin', generate_password_hash('admin'), 'admin', 'Главный Администратор'))
@@ -69,10 +75,10 @@ class DatabaseManager:
                                ('Люкс с видом на море', 12000.0, 'Роскошный номер с панорамными окнами и джакузи.', '/static/placeholder.jpg', 'Wi-Fi, Джакузи, Панорамный вид, Завтрак включен'))
             
             if cursor.execute("SELECT COUNT(*) FROM menu").fetchone()[0] == 0:
-                cursor.execute("INSERT INTO menu (name, price, description, image) VALUES (?, ?, ?, ?)",
-                               ('Круассан с лососем', 650.0, 'Свежий круассан, сливочный сыр, лосось', '/static/placeholder.jpg'))
-                cursor.execute("INSERT INTO menu (name, price, description, image) VALUES (?, ?, ?, ?)",
-                               ('Стейк Рибай', 2500.0, 'Мраморная говядина, овощи гриль', '/static/placeholder.jpg'))
+                cursor.execute("INSERT INTO menu (name, price, description, image, ingredients) VALUES (?, ?, ?, ?, ?)",
+                               ('Круассан с лососем', 650.0, 'Свежий круассан, сливочный сыр, лосось', '/static/placeholder.jpg', 'Сливочный сыр, Лосось, Зелень'))
+                cursor.execute("INSERT INTO menu (name, price, description, image, ingredients) VALUES (?, ?, ?, ?, ?)",
+                               ('Стейк Рибай', 2500.0, 'Мраморная говядина, овощи гриль', '/static/placeholder.jpg', 'Розмарин, Масло, Соль, Перец'))
             
             if cursor.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 0:
                 cursor.executescript("""
@@ -121,26 +127,21 @@ class DatabaseManager:
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM rooms").fetchall()
     def get_room(self, room_id):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM rooms WHERE id = ?", (room_id,)).fetchone()
-    
-    # ОГРАНИЧЕНИЕ ЦЕНЫ КОМНАТЫ (МИНИМУМ 1000)
     def add_room(self, title, price, description, images, amenities):
         price = max(float(price), 1000.0)
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO rooms (title, price, description, images, amenities) VALUES (?, ?, ?, ?, ?)", (title, price, description, images, amenities))
             conn.commit()
-            
     def update_room(self, room_id, title, price, description, images, amenities):
         price = max(float(price), 1000.0)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE rooms SET title=?, price=?, description=?, images=?, amenities=? WHERE id=?", (title, price, description, images, amenities, room_id))
             conn.commit()
-            
     def update_room_price_title(self, room_id, title, price):
         price = max(float(price), 1000.0)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE rooms SET title = ?, price = ? WHERE id = ?", (title, price, room_id))
             conn.commit()
-
     def delete_room(self, room_id):
         with self.get_connection() as conn:
             conn.cursor().execute("DELETE FROM rooms WHERE id = ?", (room_id,))
@@ -150,26 +151,21 @@ class DatabaseManager:
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu").fetchall()
     def get_menu_item(self, item_id):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu WHERE id = ?", (item_id,)).fetchone()
-    
-    # ОГРАНИЧЕНИЕ ЦЕНЫ БЛЮДА (МИНИМУМ 200)
-    def add_menu_item(self, name, price, description, image):
+    def add_menu_item(self, name, price, description, image, ingredients):
         price = max(float(price), 200.0)
         with self.get_connection() as conn:
-            conn.cursor().execute("INSERT INTO menu (name, price, description, image) VALUES (?, ?, ?, ?)", (name, price, description, image))
+            conn.cursor().execute("INSERT INTO menu (name, price, description, image, ingredients) VALUES (?, ?, ?, ?, ?)", (name, price, description, image, ingredients))
             conn.commit()
-            
-    def update_menu_item(self, item_id, name, price, description, image):
+    def update_menu_item(self, item_id, name, price, description, image, ingredients):
         price = max(float(price), 200.0)
         with self.get_connection() as conn:
-            conn.cursor().execute("UPDATE menu SET name=?, price=?, description=?, image=? WHERE id=?", (name, price, description, image, item_id))
+            conn.cursor().execute("UPDATE menu SET name=?, price=?, description=?, image=?, ingredients=? WHERE id=?", (name, price, description, image, ingredients, item_id))
             conn.commit()
-            
     def update_menu_price_name(self, item_id, name, price):
         price = max(float(price), 200.0)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE menu SET name = ?, price = ? WHERE id = ?", (name, price, item_id))
             conn.commit()
-
     def delete_menu_item(self, item_id):
         with self.get_connection() as conn:
             conn.cursor().execute("DELETE FROM menu WHERE id = ?", (item_id,))
@@ -345,7 +341,18 @@ def food_menu():
 @app.route('/food/order', methods=['POST'])
 def order_food():
     if session.get('role') != 'user': return "Доступ запрещен", 403
-    db.add_food_order(session['user_id'], request.form['room_id'], request.form['item_name'], float(request.form['price']), int(request.form['quantity']))
+    base_name = request.form['item_name']
+    
+    # Собираем ингредиенты
+    selected_ing = request.form.getlist('ingredients')
+    custom_ing = request.form.get('custom_ingredients', '').strip()
+    extras = selected_ing + ([custom_ing] if custom_ing else [])
+    
+    final_name = base_name
+    if extras:
+        final_name += f" (Доп: {', '.join(extras)})"
+        
+    db.add_food_order(session['user_id'], request.form['room_id'], final_name, float(request.form['price']), int(request.form['quantity']))
     flash('Заказ принят! Ожидайте доставку.', 'success')
     return redirect(url_for('user_dashboard'))
 
@@ -374,7 +381,6 @@ def admin_batch_edit_rooms():
         return redirect(url_for('admin_dashboard'))
     return render_template('admin_batch_edit.html', rooms=db.get_all_rooms())
 
-# НОВЫЙ МАРШРУТ ДЛЯ МАССОВОГО РЕДАКТИРОВАНИЯ МЕНЮ
 @app.route('/admin/batch_edit_menu', methods=['GET', 'POST'])
 def admin_batch_edit_menu():
     if session.get('role') != 'admin': return "Доступ запрещен", 403
@@ -431,7 +437,7 @@ def admin_add_menu():
     if session.get('role') != 'admin': return "Доступ запрещен", 403
     if request.method == 'POST':
         image_str = db.save_files([request.files.get('image')]) or '/static/placeholder.jpg'
-        db.add_menu_item(request.form['name'], float(request.form['price']), request.form['description'], image_str)
+        db.add_menu_item(request.form['name'], float(request.form['price']), request.form['description'], image_str, request.form.get('ingredients', ''))
         flash('Блюдо добавлено!', 'success')
         return redirect(url_for('admin_dashboard'))
     return render_template('admin_add_menu.html')
@@ -443,7 +449,7 @@ def admin_edit_menu(item_id):
     if request.method == 'POST':
         new_image = db.save_files([request.files.get('image')])
         image_str = new_image if new_image else item['image']
-        db.update_menu_item(item_id, request.form['name'], float(request.form['price']), request.form['description'], image_str)
+        db.update_menu_item(item_id, request.form['name'], float(request.form['price']), request.form['description'], image_str, request.form.get('ingredients', ''))
         flash('Блюдо обновлено!', 'success')
         return redirect(url_for('admin_dashboard'))
     return render_template('admin_edit_menu.html', item=item)
