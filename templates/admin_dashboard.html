@@ -1,111 +1,122 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container my-5">
-    <h1 class="mb-4 display-5">Тотальный Контроль</h1>
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3"><div class="card p-4 bg-dark text-white border-0 shadow-sm h-100"><h6 class="text-uppercase small text-muted mb-2">Выручка</h6><h3 class="mb-0 text-gold">{{ revenue }} ₽</h3></div></div>
-        <div class="col-md-3 mb-3"><div class="card p-4 border-0 shadow-sm h-100"><h6 class="text-uppercase small text-muted mb-2">Всего Броней</h6><h3 class="mb-0">{{ bookings|length }}</h3></div></div>
-        <div class="col-md-3 mb-3"><div class="card p-4 border-0 shadow-sm h-100"><h6 class="text-uppercase small text-muted mb-2">Заказов Еды</h6><h3 class="mb-0">{{ food_orders|length }}</h3></div></div>
-        <div class="col-md-3 mb-3"><div class="card p-4 border-0 shadow-sm h-100"><h6 class="text-uppercase small text-muted mb-2">Пользователей</h6><h3 class="mb-0">{{ users|length }}</h3></div></div>
-    </div>
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>Управление</h3>
-        <div>
-            <a href="{{ url_for('admin_add_room') }}" class="btn btn-gold rounded-0 me-2"><i class="fas fa-plus me-2"></i>Добавить номер</a>
-            <a href="{{ url_for('admin_add_menu') }}" class="btn btn-outline-gold rounded-0"><i class="fas fa-utensils me-2"></i>Добавить блюдо</a>
+<div class="container-fluid my-4 px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="display-6">Панель Администратора</h1>
+        <div class="alert alert-success mb-0 py-2 px-3 shadow-sm">
+            <strong>Выручка:</strong> {{ "%.2f"|format(revenue) }} ₽
         </div>
     </div>
+
     <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
-        <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-bookings">Брони</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-rooms">Номера</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-menu">Меню</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-food">Заказы Еды</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-users">Юзеры</button></li>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-reviews">Отзывы</button></li>
+        <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#bookings">Брони</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#rooms">Номера</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#food">Заказы еды</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#menu">Меню ресторана</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#users">Пользователи</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#reviews">Отзывы</button></li>
     </ul>
+
     <div class="tab-content">
-        <div class="tab-pane fade show active" id="tab-bookings">
-            <div class="card border-0 shadow-sm"><div class="card-body p-0 table-responsive"><table class="table table-hover mb-0">
-                <thead><tr><th>ID</th><th>Гость</th><th>Номер</th><th>Даты (Изменить)</th><th>Сумма (Изменить)</th><th>Статус</th><th></th></tr></thead>
+        
+        <!-- ВКЛАДКА: БРОНИ -->
+        <div class="tab-pane fade show active" id="bookings">
+            <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
+                <thead class="table-dark"><tr><th>ID</th><th>Гость</th><th>Номер</th><th>Даты</th><th>Статус</th><th>Сумма</th><th>Действия</th></tr></thead>
                 <tbody>
                     {% for b in bookings %}
                     <tr>
-                        <td>#{{ b.id }}</td><td>{{ b.guest_name }}</td><td>{{ b.title }}</td>
-                        <form action="{{ url_for('admin_edit_booking', booking_id=b.id) }}" method="POST">
-                        <td class="small">
-                            <input type="date" name="check_in" value="{{ b.check_in }}" class="form-control form-control-sm mb-1">
-                            <input type="date" name="check_out" value="{{ b.check_out }}" class="form-control form-control-sm">
-                        </td>
-                        <td><input type="number" name="total_price" value="{{ b.total_price }}" class="form-control form-control-sm" style="width: 100px;"></td>
+                        <td>{{ b.id }}</td>
+                        <td>{{ b.guest_name }}</td>
+                        <td>{{ b.title }}</td>
+                        <td>{{ b.check_in }} - {{ b.check_out }}</td>
+                        <td><span class="badge bg-info text-dark">{{ b.status }}</span></td>
+                        <td>{{ b.total_price }} ₽</td>
                         <td>
-                            <select name="status" class="form-select form-select-sm rounded-0">
-                                <option value="Забронировано" {% if b.status == 'Забронировано' %}selected{% endif %}>Забронировано</option>
-                                <option value="Оплачено" {% if b.status == 'Оплачено' %}selected{% endif %}>Оплачено</option>
-                                <option value="Выселен" {% if b.status == 'Выселен' %}selected{% endif %}>Выселен</option>
-                            </select>
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editBookingModal{{ b.id }}">Изменить</button>
+                            <a href="{{ url_for('admin_delete_booking', booking_id=b.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить бронь?')">Удалить</a>
                         </td>
-                        <td><button type="submit" class="btn btn-sm btn-success"><i class="fas fa-save"></i></button></form>
-                            <a href="{{ url_for('admin_delete_booking', booking_id=b.id) }}" class="btn btn-sm btn-outline-danger mt-1" onclick="return confirm('Удалить?')"><i class="fas fa-trash"></i></a>
+                    </tr>
+                    <!-- Модальное окно редактирования брони -->
+                    <div class="modal fade" id="editBookingModal{{ b.id }}" tabindex="-1">
+                        <div class="modal-dialog"><div class="modal-content"><form method="POST" action="{{ url_for('admin_edit_booking', booking_id=b.id) }}">
+                            <div class="modal-header"><h5 class="modal-title">Бронь #{{ b.id }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <div class="mb-2"><label>Заезд</label><input type="date" name="check_in" value="{{ b.check_in }}" class="form-control" required></div>
+                                <div class="mb-2"><label>Выезд</label><input type="date" name="check_out" value="{{ b.check_out }}" class="form-control" required></div>
+                                <div class="mb-2"><label>Статус</label>
+                                    <select name="status" class="form-select">
+                                        <option value="Забронировано" {% if b.status == 'Забронировано' %}selected{% endif %}>Забронировано</option>
+                                        <option value="Оплачено" {% if b.status == 'Оплачено' %}selected{% endif %}>Оплачено</option>
+                                        <option value="Завершено" {% if b.status == 'Завершено' %}selected{% endif %}>Завершено</option>
+                                        <option value="Отменено" {% if b.status == 'Отменено' %}selected{% endif %}>Отменено</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2"><label>Итоговая сумма</label><input type="number" step="0.01" name="total_price" value="{{ b.total_price }}" class="form-control" required></div>
+                            </div>
+                            <div class="modal-footer"><button type="submit" class="btn btn-primary">Сохранить</button></div>
+                        </form></div></div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table></div></div>
+        </div>
+
+        <!-- ВКЛАДКА: НОМЕРА -->
+        <div class="tab-pane fade" id="rooms">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4>Список номеров</h4>
+                <div>
+                    <!-- НОВАЯ КНОПКА МАССОВОГО ИЗМЕНЕНИЯ -->
+                    <a href="{{ url_for('admin_batch_edit_rooms') }}" class="btn btn-warning fw-bold shadow-sm">
+                        ⚡ Массовое изменение
+                    </a>
+                    <!-- Кнопка добавления -->
+                    <a href="{{ url_for('admin_add_room') }}" class="btn btn-success shadow-sm ms-2">
+                        + Добавить номер
+                    </a>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
+                <thead class="table-dark"><tr><th>ID</th><th>Фото</th><th>Название</th><th>Цена</th><th>Действия</th></tr></thead>
+                <tbody>
+                    {% for r in rooms %}
+                    <tr>
+                        <td>{{ r.id }}</td>
+                        <td><img src="{{ r.images.split(',')[0] }}" style="height: 40px; width: 60px; object-fit: cover;" class="rounded"></td>
+                        <td>{{ r.title }}</td>
+                        <td>{{ r.price }} ₽</td>
+                        <td>
+                            <a href="{{ url_for('admin_edit_room', room_id=r.id) }}" class="btn btn-sm btn-outline-primary">Изменить</a>
+                            <a href="{{ url_for('admin_delete_room', room_id=r.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить номер?')">Удалить</a>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table></div></div>
         </div>
-        <div class="tab-pane fade" id="tab-rooms">
-            <div class="row">
-                {% for r in rooms %}
-                <div class="col-md-4 mb-4">
-                    <div class="card h-100 border-0 shadow-sm">
-                        <img src="{{ r.images.split(',')[0] }}" class="card-img-top" style="height: 150px; object-fit: cover;">
-                        <div class="card-body">
-                            <h5 class="card-title">{{ r.title }}</h5>
-                            <p class="text-gold fw-bold mb-1">{{ r.price }} ₽/ночь</p>
-                            <p class="small text-muted mb-3">{{ r.description[:50] }}...</p>
-                            <div class="d-flex justify-content-between">
-                                <a href="{{ url_for('admin_edit_room', room_id=r.id) }}" class="btn btn-sm btn-dark w-50 me-1 rounded-0"><i class="fas fa-edit"></i> Изменить</a>
-                                <a href="{{ url_for('admin_delete_room', room_id=r.id) }}" class="btn btn-sm btn-outline-danger w-50 ms-1 rounded-0" onclick="return confirm('Удалить номер?')"><i class="fas fa-trash"></i> Удалить</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        <div class="tab-pane fade" id="tab-menu">
-            <div class="row">
-                {% for m in menu %}
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100 border-0 shadow-sm">
-                        <img src="{{ m.image }}" class="card-img-top" style="height: 120px; object-fit: cover;">
-                        <div class="card-body">
-                            <h6 class="card-title">{{ m.name }}</h6>
-                            <p class="text-gold fw-bold mb-2">{{ m.price }} ₽</p>
-                            <div class="d-flex justify-content-between">
-                                <a href="{{ url_for('admin_edit_menu', item_id=m.id) }}" class="btn btn-sm btn-dark w-50 me-1 rounded-0"><i class="fas fa-edit"></i></a>
-                                <a href="{{ url_for('admin_delete_menu', item_id=m.id) }}" class="btn btn-sm btn-outline-danger w-50 ms-1 rounded-0" onclick="return confirm('Удалить блюдо?')"><i class="fas fa-trash"></i></a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        <div class="tab-pane fade" id="tab-food">
-            <div class="card border-0 shadow-sm"><div class="card-body p-0 table-responsive"><table class="table table-hover mb-0">
-                <thead><tr><th>ID</th><th>Гость</th><th>Номер</th><th>Блюдо</th><th>Кол-во</th><th>Статус</th></tr></thead>
+
+        <!-- ВКЛАДКА: ЗАКАЗЫ ЕДЫ -->
+        <div class="tab-pane fade" id="food">
+            <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
+                <thead class="table-dark"><tr><th>ID</th><th>Гость</th><th>Номер</th><th>Блюдо</th><th>Кол-во</th><th>Статус</th><th>Действия</th></tr></thead>
                 <tbody>
                     {% for f in food_orders %}
                     <tr>
-                        <td>#{{ f.id }}</td><td>{{ f.guest_name }}</td><td>{{ f.room_title }}</td><td class="fw-bold">{{ f.item_name }}</td><td>{{ f.quantity }}</td>
+                        <td>{{ f.id }}</td>
+                        <td>{{ f.guest_name }}</td>
+                        <td>{{ f.room_title }}</td>
+                        <td>{{ f.item_name }}</td>
+                        <td>{{ f.quantity }}</td>
+                        <td><span class="badge bg-warning text-dark">{{ f.status }}</span></td>
                         <td>
-                            <form action="{{ url_for('admin_update_food', order_id=f.id) }}" method="POST" class="d-flex">
-                                <select name="status" class="form-select form-select-sm me-1 rounded-0" style="width: 120px;">
+                            <form method="POST" action="{{ url_for('admin_update_food', order_id=f.id) }}" class="d-flex">
+                                <select name="status" class="form-select form-select-sm me-2" style="width: auto;">
                                     <option value="Готовится" {% if f.status == 'Готовится' %}selected{% endif %}>Готовится</option>
                                     <option value="В пути" {% if f.status == 'В пути' %}selected{% endif %}>В пути</option>
                                     <option value="Доставлено" {% if f.status == 'Доставлено' %}selected{% endif %}>Доставлено</option>
                                 </select>
-                                <button type="submit" class="btn btn-sm btn-dark rounded-0"><i class="fas fa-check"></i></button>
+                                <button type="submit" class="btn btn-sm btn-primary">OK</button>
                             </form>
                         </td>
                     </tr>
@@ -113,36 +124,77 @@
                 </tbody>
             </table></div></div>
         </div>
-        <div class="tab-pane fade" id="tab-users">
-            <div class="card border-0 shadow-sm"><div class="card-body p-0 table-responsive"><table class="table table-hover mb-0">
-                <thead><tr><th>ID</th><th>Логин</th><th>ФИО</th><th>Телефон</th><th>Роль</th><th>Действия</th></tr></thead>
+
+        <!-- ВКЛАДКА: МЕНЮ -->
+        <div class="tab-pane fade" id="menu">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4>Меню ресторана</h4>
+                <a href="{{ url_for('admin_add_menu') }}" class="btn btn-success shadow-sm">+ Добавить блюдо</a>
+            </div>
+            <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
+                <thead class="table-dark"><tr><th>ID</th><th>Фото</th><th>Название</th><th>Цена</th><th>Действия</th></tr></thead>
                 <tbody>
-                    {% for u in users %}
+                    {% for m in menu %}
                     <tr>
-                        <td>#{{ u.id }}</td><td>{{ u.username }}</td><td>{{ u.fullname }}</td><td>{{ u.phone }}</td>
-                        <td><span class="badge {% if u.role == 'admin' %}bg-danger{% else %}bg-secondary{% endif %}">{{ u.role }}</span></td>
+                        <td>{{ m.id }}</td>
+                        <td><img src="{{ m.image }}" style="height: 40px; width: 60px; object-fit: cover;" class="rounded"></td>
+                        <td>{{ m.name }}</td>
+                        <td>{{ m.price }} ₽</td>
                         <td>
-                            {% if u.role != 'admin' %}<a href="{{ url_for('admin_make_admin', user_id=u.id) }}" class="btn btn-sm btn-outline-dark" title="Сделать админом"><i class="fas fa-user-shield"></i></a>{% endif %}
-                            {% if u.id != session['user_id'] %}<a href="{{ url_for('admin_delete_user', user_id=u.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить пользователя?')"><i class="fas fa-trash"></i></a>{% endif %}
+                            <a href="{{ url_for('admin_edit_menu', item_id=m.id) }}" class="btn btn-sm btn-outline-primary">Изменить</a>
+                            <a href="{{ url_for('admin_delete_menu', item_id=m.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить блюдо?')">Удалить</a>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table></div></div>
         </div>
-        <div class="tab-pane fade" id="tab-reviews">
-            <div class="card border-0 shadow-sm"><div class="card-body p-0 table-responsive"><table class="table table-hover mb-0">
-                <thead><tr><th>Гость</th><th>Номер</th><th>Оценка</th><th>Комментарий</th><th>Удалить</th></tr></thead>
+
+        <!-- ВКЛАДКА: ПОЛЬЗОВАТЕЛИ -->
+        <div class="tab-pane fade" id="users">
+            <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
+                <thead class="table-dark"><tr><th>ID</th><th>Логин</th><th>ФИО</th><th>Телефон</th><th>Роль</th><th>Действия</th></tr></thead>
                 <tbody>
-                    {% for r in reviews %}
+                    {% for u in users %}
                     <tr>
-                        <td>{{ r.guest_name }}</td><td>{{ r.room_title }}</td><td class="text-gold">{% for i in range(r.rating) %}<i class="fas fa-star"></i>{% endfor %}</td><td>{{ r.comment }}</td>
-                        <td><a href="{{ url_for('admin_delete_review', review_id=r.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить отзыв?')"><i class="fas fa-trash"></i></a></td>
+                        <td>{{ u.id }}</td>
+                        <td>{{ u.username }}</td>
+                        <td>{{ u.fullname }}</td>
+                        <td>{{ u.phone }}</td>
+                        <td><span class="badge {% if u.role == 'admin' %}bg-danger{% else %}bg-secondary{% endif %}">{{ u.role }}</span></td>
+                        <td>
+                            {% if u.role != 'admin' %}
+                            <a href="{{ url_for('admin_make_admin', user_id=u.id) }}" class="btn btn-sm btn-outline-warning">Сделать админом</a>
+                            {% endif %}
+                            {% if u.id != session.user_id %}
+                            <a href="{{ url_for('admin_delete_user', user_id=u.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить пользователя?')">Удалить</a>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table></div></div>
         </div>
+
+        <!-- ВКЛАДКА: ОТЗЫВЫ -->
+        <div class="tab-pane fade" id="reviews">
+            <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
+                <thead class="table-dark"><tr><th>Дата</th><th>Гость</th><th>Номер</th><th>Оценка</th><th>Комментарий</th><th>Действия</th></tr></thead>
+                <tbody>
+                    {% for r in reviews %}
+                    <tr>
+                        <td>{{ r.date }}</td>
+                        <td>{{ r.guest_name }}</td>
+                        <td>{{ r.room_title }}</td>
+                        <td><span class="text-warning">{{ '★' * r.rating }}</span></td>
+                        <td>{{ r.comment }}</td>
+                        <td><a href="{{ url_for('admin_delete_review', review_id=r.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить отзыв?')">Удалить</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table></div></div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
