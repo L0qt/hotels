@@ -52,15 +52,21 @@ class DatabaseManager:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, room_id INTEGER,
                     item_name TEXT, price REAL, quantity INTEGER, status TEXT DEFAULT 'Готовится', date TEXT
                 );
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY, value REAL
+                );
             """)
             
-            # Автоматическая миграция для ингредиентов
-            try:
-                cursor.execute("ALTER TABLE menu ADD COLUMN ingredients TEXT DEFAULT ''")
-            except sqlite3.OperationalError:
-                pass
+            # Миграции
+            try: cursor.execute("ALTER TABLE menu ADD COLUMN ingredients TEXT DEFAULT ''")
+            except sqlite3.OperationalError: pass
             
-            # ДОБАВЛЯЕМ СТАНДАРТНЫХ ПОЛЬЗОВАТЕЛЕЙ И НОМЕРА
+            if not cursor.execute("SELECT * FROM settings WHERE key = 'min_room_price'").fetchone():
+                cursor.execute("INSERT INTO settings (key, value) VALUES ('min_room_price', 1000.0)")
+            if not cursor.execute("SELECT * FROM settings WHERE key = 'min_menu_price'").fetchone():
+                cursor.execute("INSERT INTO settings (key, value) VALUES ('min_menu_price', 200.0)")
+
+            # Пользователи и номера
             if not cursor.execute("SELECT * FROM users WHERE username = 'admin'").fetchone():
                 cursor.execute("INSERT INTO users (username, password, role, fullname) VALUES (?, ?, ?, ?)",
                                ('admin', generate_password_hash('admin'), 'admin', 'Главный Администратор'))
@@ -72,26 +78,33 @@ class DatabaseManager:
             if cursor.execute("SELECT COUNT(*) FROM rooms").fetchone()[0] == 0:
                 cursor.execute("INSERT INTO rooms (title, price, description, images, amenities) VALUES (?, ?, ?, ?, ?)",
                                ('Стандартный номер', 3500.0, 'Уютный номер с одной большой кроватью.', '/static/placeholder.jpg', 'Wi-Fi, Кондиционер, ТВ, Мини-бар'))
-                cursor.execute("INSERT INTO rooms (title, price, description, images, amenities) VALUES (?, ?, ?, ?, ?)",
-                               ('Люкс с видом на море', 12000.0, 'Роскошный номер с панорамными окнами и джакузи.', '/static/placeholder.jpg', 'Wi-Fi, Джакузи, Панорамный вид, Завтрак включен'))
             
             if cursor.execute("SELECT COUNT(*) FROM menu").fetchone()[0] == 0:
                 cursor.execute("INSERT INTO menu (name, price, description, image, ingredients) VALUES (?, ?, ?, ?, ?)",
-                               ('Круассан с лососем', 650.0, 'Свежий круассан, сливочный сыр, лосось', '/static/placeholder.jpg', 'Сливочный сыр, Лосось, Зелень'))
-                cursor.execute("INSERT INTO menu (name, price, description, image, ingredients) VALUES (?, ?, ?, ?, ?)",
-                               ('Стейк Рибай', 2500.0, 'Мраморная говядина, овощи гриль', '/static/placeholder.jpg', 'Розмарин, Масло, Соль, Перец'))
+                               ('Круассан с лососем', 650.0, 'Свежий круассан', '/static/placeholder.jpg', 'Сыр, Лосось'))
             
             if cursor.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 0:
                 cursor.executescript("""
                     INSERT INTO reviews (room_id, user_id, rating, comment, date) VALUES 
-                    (1, 2, 5, 'Отличный номер, всё чисто и уютно!', '2026-10-20'),
-                    (2, 1, 5, 'Вид на море просто потрясающий!', '2026-10-21');
+                    (1, 2, 5, 'Отличный номер!', '2026-10-20');
                 """)
 
-            # АВТОМАТИЧЕСКОЕ ИСПРАВЛЕНИЕ ЦЕН ПРИ ЗАПУСКЕ
-            cursor.execute("UPDATE rooms SET price = 1000.0 WHERE price < 1000.0")
-            cursor.execute("UPDATE menu SET price = 200.0 WHERE price < 200.0")
-            
+            # Автоисправление цен при запуске
+            min_room = cursor.execute("SELECT value FROM settings WHERE key = 'min_room_price'").fetchone()[0]
+            min_menu = cursor.execute("SELECT value FROM settings WHERE key = 'min_menu_price'").fetchone()[0]
+            cursor.execute("UPDATE rooms SET price = ? WHERE price < ?", (min_room, min_room))
+            cursor.execute("UPDATE menu SET price = ? WHERE price < ?", (min_menu, min_menu))
+            conn.commit()
+
+    # НОВЫЕ МЕТОДЫ ДЛЯ РАБОТЫ С НАСТРОЙКАМИ ЦЕН
+    def get_min_price(self, key):
+        with self.get_connection() as conn:
+            res = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+            return res['value'] if res else (1000.0 if key == 'min_room_price' else 200.0)
+
+    def update_min_price(self, key, value):
+        with self.get_connection() as conn:
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
             conn.commit()
 
     def save_files(self, files):
@@ -133,21 +146,28 @@ class DatabaseManager:
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM rooms").fetchall()
     def get_room(self, room_id):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM rooms WHERE id = ?", (room_id,)).fetchone()
+    
     def add_room(self, title, price, description, images, amenities):
-        price = max(float(price), 1000.0)
+        min_p = self.get_min_price('min_room_price')
+        price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO rooms (title, price, description, images, amenities) VALUES (?, ?, ?, ?, ?)", (title, price, description, images, amenities))
             conn.commit()
+            
     def update_room(self, room_id, title, price, description, images, amenities):
-        price = max(float(price), 1000.0)
+        min_p = self.get_min_price('min_room_price')
+        price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE rooms SET title=?, price=?, description=?, images=?, amenities=? WHERE id=?", (title, price, description, images, amenities, room_id))
             conn.commit()
+            
     def update_room_price_title(self, room_id, title, price):
-        price = max(float(price), 1000.0)
+        min_p = self.get_min_price('min_room_price')
+        price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE rooms SET title = ?, price = ? WHERE id = ?", (title, price, room_id))
             conn.commit()
+            
     def delete_room(self, room_id):
         with self.get_connection() as conn:
             conn.cursor().execute("DELETE FROM rooms WHERE id = ?", (room_id,))
@@ -157,21 +177,28 @@ class DatabaseManager:
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu").fetchall()
     def get_menu_item(self, item_id):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu WHERE id = ?", (item_id,)).fetchone()
+    
     def add_menu_item(self, name, price, description, image, ingredients):
-        price = max(float(price), 200.0)
+        min_p = self.get_min_price('min_menu_price')
+        price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO menu (name, price, description, image, ingredients) VALUES (?, ?, ?, ?, ?)", (name, price, description, image, ingredients))
             conn.commit()
+            
     def update_menu_item(self, item_id, name, price, description, image, ingredients):
-        price = max(float(price), 200.0)
+        min_p = self.get_min_price('min_menu_price')
+        price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE menu SET name=?, price=?, description=?, image=?, ingredients=? WHERE id=?", (name, price, description, image, ingredients, item_id))
             conn.commit()
+            
     def update_menu_price_name(self, item_id, name, price):
-        price = max(float(price), 200.0)
+        min_p = self.get_min_price('min_menu_price')
+        price = max(float(price), min_p)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE menu SET name = ?, price = ? WHERE id = ?", (name, price, item_id))
             conn.commit()
+            
     def delete_menu_item(self, item_id):
         with self.get_connection() as conn:
             conn.cursor().execute("DELETE FROM menu WHERE id = ?", (item_id,))
@@ -365,17 +392,28 @@ def admin_dashboard():
     return render_template('admin_dashboard.html', 
                            users=db.get_all_users(), rooms=db.get_all_rooms(), menu=db.get_all_menu(),
                            bookings=bookings, food_orders=db.get_all_food_orders(), 
-                           reviews=db.get_all_reviews(), revenue=sum(float(b['total_price']) for b in bookings if b['total_price']))
+                           reviews=db.get_all_reviews(), revenue=sum(float(b['total_price']) for b in bookings if b['total_price']),
+                           min_room_price=db.get_min_price('min_room_price'),
+                           min_menu_price=db.get_min_price('min_menu_price'))
 
-# НОВЫЙ МАРШРУТ ДЛЯ ПРИНУДИТЕЛЬНОГО ПОВЫШЕНИЯ ЦЕН
-@app.route('/admin/apply_min_prices')
-def admin_apply_min_prices():
+# НОВЫЙ МАРШРУТ ДЛЯ ОБНОВЛЕНИЯ МИНИМАЛЬНЫХ ЦЕН
+@app.route('/admin/update_min_prices', methods=['POST'])
+def admin_update_min_prices():
     if session.get('role') != 'admin': return "Доступ запрещен", 403
+    
+    min_room = float(request.form['min_room'])
+    min_menu = float(request.form['min_menu'])
+    
+    db.update_min_price('min_room_price', min_room)
+    db.update_min_price('min_menu_price', min_menu)
+    
+    # Принудительно обновляем текущие позиции
     with db.get_connection() as conn:
-        conn.execute("UPDATE rooms SET price = 1000.0 WHERE price < 1000.0")
-        conn.execute("UPDATE menu SET price = 200.0 WHERE price < 200.0")
+        conn.execute("UPDATE rooms SET price = ? WHERE price < ?", (min_room, min_room))
+        conn.execute("UPDATE menu SET price = ? WHERE price < ?", (min_menu, min_menu))
         conn.commit()
-    flash('Все цены ниже минимальных были автоматически повышены (Номера: 1000 ₽, Блюда: 200 ₽)!', 'success')
+        
+    flash('Минимальные цены обновлены, а все дешевые позиции автоматически подорожали!', 'success')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/batch_edit_rooms', methods=['GET', 'POST'])
