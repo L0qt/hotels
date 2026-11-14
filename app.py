@@ -3,7 +3,6 @@ import sqlite3
 import os
 import uuid
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 from datetime import datetime
 
 app = Flask(__name__)
@@ -122,17 +121,22 @@ class DatabaseManager:
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM rooms").fetchall()
     def get_room(self, room_id):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM rooms WHERE id = ?", (room_id,)).fetchone()
+    
+    # ОГРАНИЧЕНИЕ ЦЕНЫ КОМНАТЫ (МИНИМУМ 1000)
     def add_room(self, title, price, description, images, amenities):
+        price = max(float(price), 1000.0)
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO rooms (title, price, description, images, amenities) VALUES (?, ?, ?, ?, ?)", (title, price, description, images, amenities))
             conn.commit()
+            
     def update_room(self, room_id, title, price, description, images, amenities):
+        price = max(float(price), 1000.0)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE rooms SET title=?, price=?, description=?, images=?, amenities=? WHERE id=?", (title, price, description, images, amenities, room_id))
             conn.commit()
             
-    # НОВЫЙ МЕТОД ДЛЯ МАССОВОГО ОБНОВЛЕНИЯ
     def update_room_price_title(self, room_id, title, price):
+        price = max(float(price), 1000.0)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE rooms SET title = ?, price = ? WHERE id = ?", (title, price, room_id))
             conn.commit()
@@ -146,14 +150,26 @@ class DatabaseManager:
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu").fetchall()
     def get_menu_item(self, item_id):
         with self.get_connection() as conn: return conn.cursor().execute("SELECT * FROM menu WHERE id = ?", (item_id,)).fetchone()
+    
+    # ОГРАНИЧЕНИЕ ЦЕНЫ БЛЮДА (МИНИМУМ 200)
     def add_menu_item(self, name, price, description, image):
+        price = max(float(price), 200.0)
         with self.get_connection() as conn:
             conn.cursor().execute("INSERT INTO menu (name, price, description, image) VALUES (?, ?, ?, ?)", (name, price, description, image))
             conn.commit()
+            
     def update_menu_item(self, item_id, name, price, description, image):
+        price = max(float(price), 200.0)
         with self.get_connection() as conn:
             conn.cursor().execute("UPDATE menu SET name=?, price=?, description=?, image=? WHERE id=?", (name, price, description, image, item_id))
             conn.commit()
+            
+    def update_menu_price_name(self, item_id, name, price):
+        price = max(float(price), 200.0)
+        with self.get_connection() as conn:
+            conn.cursor().execute("UPDATE menu SET name = ?, price = ? WHERE id = ?", (name, price, item_id))
+            conn.commit()
+
     def delete_menu_item(self, item_id):
         with self.get_connection() as conn:
             conn.cursor().execute("DELETE FROM menu WHERE id = ?", (item_id,))
@@ -210,59 +226,40 @@ class DatabaseManager:
 
 db = DatabaseManager()
 
-# ─────────────────────────────────────────────────────────────
-# ОПОВЕЩЕНИЯ О ЗАЕЗДЕ / ВЫЕЗДЕ
-# ─────────────────────────────────────────────────────────────
 ACTIVE_BOOKING_STATUSES = ('Забронировано', 'Оплачено')
 CHECK_IN_REMIND_DAYS = 3
 
 def get_user_notifications(bookings):
     today = datetime.now().date()
     notifications = []
-
     for b in bookings:
-        if b['status'] not in ACTIVE_BOOKING_STATUSES:
-            continue
-
+        if b['status'] not in ACTIVE_BOOKING_STATUSES: continue
         try:
             check_in = datetime.strptime(b['check_in'], '%Y-%m-%d').date()
             check_out = datetime.strptime(b['check_out'], '%Y-%m-%d').date()
-        except (ValueError, TypeError):
-            continue
-
+        except (ValueError, TypeError): continue
         room_title = b['title'] or f"№{b['room_id']}"
         days_to_in = (check_in - today).days
         days_to_out = (check_out - today).days
-
         if days_to_in == 0:
-            notifications.append({'type': 'warning', 'icon': '🔑', 'title': 'Заезд сегодня', 'message': f'Сегодня заезд в номер «{room_title}». Возьмите документы и подтвердите бронь на ресепшене (заезд с 14:00).', 'booking_id': b['id']})
+            notifications.append({'type': 'warning', 'icon': '🔑', 'title': 'Заезд сегодня', 'message': f'Сегодня заезд в номер «{room_title}». Возьмите документы на ресепшен.', 'booking_id': b['id']})
         elif 0 < days_to_in <= CHECK_IN_REMIND_DAYS:
             notifications.append({'type': 'info', 'icon': '📅', 'title': 'Скоро заезд', 'message': f'Напоминание: заезд в номер «{room_title}» через {days_to_in} дн. ({b["check_in"]}).', 'booking_id': b['id']})
-
         if days_to_out == 0 and today >= check_in:
             notifications.append({'type': 'danger', 'icon': '🚪', 'title': 'Выезд сегодня', 'message': f'Сегодня выезд из номера «{room_title}». Освободите номер до 12:00.', 'booking_id': b['id']})
         elif days_to_out > 0 and check_in <= today < check_out:
             notifications.append({'type': 'success', 'icon': '🏨', 'title': 'Вы проживаете в отеле', 'message': f'Номер «{room_title}». Выезд через {days_to_out} дн. ({b["check_out"]}).', 'booking_id': b['id']})
-
     return notifications
 
 @app.context_processor
 def inject_notifications():
     if session.get('role') == 'user':
-        try:
-            bookings = db.get_user_bookings(session['user_id'])
-            return {'notifications': get_user_notifications(bookings)}
-        except Exception:
-            return {'notifications': []}
+        try: return {'notifications': get_user_notifications(db.get_user_bookings(session['user_id']))}
+        except Exception: return {'notifications': []}
     return {'notifications': []}
 
-# ─────────────────────────────────────────────────────────────
-# МАРШРУТЫ
-# ─────────────────────────────────────────────────────────────
-
 @app.route('/')
-def index():
-    return render_template('index.html', rooms=db.get_all_rooms(), reviews=db.get_all_reviews()[:3])
+def index(): return render_template('index.html', rooms=db.get_all_rooms(), reviews=db.get_all_reviews()[:3])
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -317,8 +314,7 @@ def book_room(room_id):
         return redirect(url_for('login'))
     room = db.get_room(room_id)
     check_in, check_out = request.form['check_in'], request.form['check_out']
-    try:
-        days = max((datetime.strptime(check_out, '%Y-%m-%d') - datetime.strptime(check_in, '%Y-%m-%d')).days, 1)
+    try: days = max((datetime.strptime(check_out, '%Y-%m-%d') - datetime.strptime(check_in, '%Y-%m-%d')).days, 1)
     except: days = 1
     db.add_booking(room_id, session['user_id'], check_in, check_out, room['price'] * days)
     flash(f'Номер "{room["title"]}" успешно забронирован!', 'success')
@@ -362,27 +358,38 @@ def admin_dashboard():
                            bookings=bookings, food_orders=db.get_all_food_orders(), 
                            reviews=db.get_all_reviews(), revenue=sum(float(b['total_price']) for b in bookings if b['total_price']))
 
-# НОВЫЙ МАРШРУТ ДЛЯ МАССОВОГО РЕДАКТИРОВАНИЯ
 @app.route('/admin/batch_edit_rooms', methods=['GET', 'POST'])
 def admin_batch_edit_rooms():
     if session.get('role') != 'admin': return "Доступ запрещен", 403
-
     if request.method == 'POST':
         selected_ids = request.form.getlist('selected_rooms')
         if not selected_ids:
             flash('Вы не выбрали ни одного номера!', 'warning')
             return redirect(url_for('admin_batch_edit_rooms'))
-
         for room_id in selected_ids:
             title = request.form.get(f'title_{room_id}')
             price = request.form.get(f'price_{room_id}')
-            if title and price:
-                db.update_room_price_title(room_id, title, float(price))
-                
+            if title and price: db.update_room_price_title(room_id, title, float(price))
         flash(f'Успешно обновлено номеров: {len(selected_ids)}', 'success')
         return redirect(url_for('admin_dashboard'))
-
     return render_template('admin_batch_edit.html', rooms=db.get_all_rooms())
+
+# НОВЫЙ МАРШРУТ ДЛЯ МАССОВОГО РЕДАКТИРОВАНИЯ МЕНЮ
+@app.route('/admin/batch_edit_menu', methods=['GET', 'POST'])
+def admin_batch_edit_menu():
+    if session.get('role') != 'admin': return "Доступ запрещен", 403
+    if request.method == 'POST':
+        selected_ids = request.form.getlist('selected_items')
+        if not selected_ids:
+            flash('Вы не выбрали ни одного блюда!', 'warning')
+            return redirect(url_for('admin_batch_edit_menu'))
+        for item_id in selected_ids:
+            name = request.form.get(f'name_{item_id}')
+            price = request.form.get(f'price_{item_id}')
+            if name and price: db.update_menu_price_name(item_id, name, float(price))
+        flash(f'Успешно обновлено блюд: {len(selected_ids)}', 'success')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('admin_batch_edit_menu.html', menu=db.get_all_menu())
 
 @app.route('/admin/add_room', methods=['GET', 'POST'])
 def admin_add_room():
