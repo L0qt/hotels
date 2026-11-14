@@ -3,8 +3,14 @@
 <div class="container-fluid my-4 px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="display-6">Панель Администратора</h1>
-        <div class="alert alert-success mb-0 py-2 px-3 shadow-sm">
-            <strong>Выручка:</strong> {{ "%.2f"|format(revenue) }} ₽
+        <div class="d-flex align-items-center gap-3">
+            <div class="alert alert-success mb-0 py-2 px-3 shadow-sm">
+                <strong>Выручка:</strong> {{ "%.2f"|format(revenue) }} ₽
+            </div>
+            <!-- НОВАЯ КНОПКА МАССОВОГО ПОДНЯТИЯ ЦЕН -->
+            <a href="{{ url_for('admin_apply_min_prices') }}" class="btn btn-danger fw-bold shadow-sm" onclick="return confirm('Все цены ниже минимальных (1000₽ для номеров и 200₽ для блюд) будут принудительно повышены. Продолжить?')">
+                ⚡ Поднять цены до минимума
+            </a>
         </div>
     </div>
 
@@ -123,7 +129,6 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4>Меню ресторана</h4>
                 <div>
-                    <!-- НОВАЯ КНОПКА МАССОВОГО ИЗМЕНЕНИЯ ДЛЯ МЕНЮ -->
                     <a href="{{ url_for('admin_batch_edit_menu') }}" class="btn btn-warning fw-bold shadow-sm">⚡ Массовое изменение</a>
                     <a href="{{ url_for('admin_add_menu') }}" class="btn btn-success shadow-sm ms-2">+ Добавить блюдо</a>
                 </div>
