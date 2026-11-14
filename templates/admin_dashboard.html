@@ -19,7 +19,7 @@
 
     <div class="tab-content">
         
-        <!-- ВКЛАДКА: БРОНИ -->
+        <!-- БРОНИ -->
         <div class="tab-pane fade show active" id="bookings">
             <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
                 <thead class="table-dark"><tr><th>ID</th><th>Гость</th><th>Номер</th><th>Даты</th><th>Статус</th><th>Сумма</th><th>Действия</th></tr></thead>
@@ -37,7 +37,6 @@
                             <a href="{{ url_for('admin_delete_booking', booking_id=b.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить бронь?')">Удалить</a>
                         </td>
                     </tr>
-                    <!-- Модальное окно редактирования брони -->
                     <div class="modal fade" id="editBookingModal{{ b.id }}" tabindex="-1">
                         <div class="modal-dialog"><div class="modal-content"><form method="POST" action="{{ url_for('admin_edit_booking', booking_id=b.id) }}">
                             <div class="modal-header"><h5 class="modal-title">Бронь #{{ b.id }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -62,19 +61,13 @@
             </table></div></div>
         </div>
 
-        <!-- ВКЛАДКА: НОМЕРА -->
+        <!-- НОМЕРА -->
         <div class="tab-pane fade" id="rooms">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4>Список номеров</h4>
                 <div>
-                    <!-- НОВАЯ КНОПКА МАССОВОГО ИЗМЕНЕНИЯ -->
-                    <a href="{{ url_for('admin_batch_edit_rooms') }}" class="btn btn-warning fw-bold shadow-sm">
-                        ⚡ Массовое изменение
-                    </a>
-                    <!-- Кнопка добавления -->
-                    <a href="{{ url_for('admin_add_room') }}" class="btn btn-success shadow-sm ms-2">
-                        + Добавить номер
-                    </a>
+                    <a href="{{ url_for('admin_batch_edit_rooms') }}" class="btn btn-warning fw-bold shadow-sm">⚡ Массовое изменение</a>
+                    <a href="{{ url_for('admin_add_room') }}" class="btn btn-success shadow-sm ms-2">+ Добавить номер</a>
                 </div>
             </div>
             <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
@@ -96,7 +89,7 @@
             </table></div></div>
         </div>
 
-        <!-- ВКЛАДКА: ЗАКАЗЫ ЕДЫ -->
+        <!-- ЗАКАЗЫ ЕДЫ -->
         <div class="tab-pane fade" id="food">
             <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
                 <thead class="table-dark"><tr><th>ID</th><th>Гость</th><th>Номер</th><th>Блюдо</th><th>Кол-во</th><th>Статус</th><th>Действия</th></tr></thead>
@@ -125,11 +118,15 @@
             </table></div></div>
         </div>
 
-        <!-- ВКЛАДКА: МЕНЮ -->
+        <!-- МЕНЮ -->
         <div class="tab-pane fade" id="menu">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4>Меню ресторана</h4>
-                <a href="{{ url_for('admin_add_menu') }}" class="btn btn-success shadow-sm">+ Добавить блюдо</a>
+                <div>
+                    <!-- НОВАЯ КНОПКА МАССОВОГО ИЗМЕНЕНИЯ ДЛЯ МЕНЮ -->
+                    <a href="{{ url_for('admin_batch_edit_menu') }}" class="btn btn-warning fw-bold shadow-sm">⚡ Массовое изменение</a>
+                    <a href="{{ url_for('admin_add_menu') }}" class="btn btn-success shadow-sm ms-2">+ Добавить блюдо</a>
+                </div>
             </div>
             <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
                 <thead class="table-dark"><tr><th>ID</th><th>Фото</th><th>Название</th><th>Цена</th><th>Действия</th></tr></thead>
@@ -150,7 +147,7 @@
             </table></div></div>
         </div>
 
-        <!-- ВКЛАДКА: ПОЛЬЗОВАТЕЛИ -->
+        <!-- ПОЛЬЗОВАТЕЛИ -->
         <div class="tab-pane fade" id="users">
             <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
                 <thead class="table-dark"><tr><th>ID</th><th>Логин</th><th>ФИО</th><th>Телефон</th><th>Роль</th><th>Действия</th></tr></thead>
@@ -176,7 +173,7 @@
             </table></div></div>
         </div>
 
-        <!-- ВКЛАДКА: ОТЗЫВЫ -->
+        <!-- ОТЗЫВЫ -->
         <div class="tab-pane fade" id="reviews">
             <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0">
                 <thead class="table-dark"><tr><th>Дата</th><th>Гость</th><th>Номер</th><th>Оценка</th><th>Комментарий</th><th>Действия</th></tr></thead>
